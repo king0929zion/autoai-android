@@ -44,13 +44,15 @@ jobs:
     - name: Report Kotlin Errors
       if: failure() && steps.compile_debug.outcome == 'failure'
       run: |
-        tail -n 200 compile-debug.log | while IFS= read -r line; do
+        tail -n 200 compile-debug.log | grep -E '(^e:|^w:|^> Task|^FAILURE:|^Caused by:)' > filtered.log || true
+        cat filtered.log
+        while IFS= read -r line; do
           line=${line//'%'/'%25'}
           line=${line//$'\r'/}
           line=${line//':'/'%3A'}
           line=${line//$'\n'/'%0A'}
           echo "::error::$line"
-        done
+        done < filtered.log
 
     - name: Compile Release Kotlin
       run: ./gradlew compileReleaseKotlin --stacktrace
