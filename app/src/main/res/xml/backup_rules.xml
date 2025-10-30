@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- 排除 API 密钥等敏感数据 -->
+    <exclude domain="sharedpref" path="api_config.xml"/>
+    <exclude domain="sharedpref" path="sensitive_data.xml"/>
+</full-backup-content>

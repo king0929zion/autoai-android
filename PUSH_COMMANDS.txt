@@ -1,0 +1,70 @@
+==============================================
+  AutoAI Android - GitHub Push Commands
+==============================================
+
+Step 1: Create GitHub Repository
+---------------------------------
+1. Go to: https://github.com/new
+2. Repository name: autoai-android
+3. Visibility: Public
+4. Click "Create repository"
+
+
+Step 2: Run These Commands
+---------------------------
+Copy and paste these commands one by one:
+
+cd F:\autoaiAndroid
+
+git init
+
+git config --global user.name "YOUR_GITHUB_USERNAME"
+
+git config --global user.email "YOUR_EMAIL@example.com"
+
+git add .
+
+git commit -m "Initial commit: AutoAI Android v0.1.0-alpha"
+
+git branch -M main
+
+git remote add origin https://github.com/YOUR_USERNAME/autoai-android.git
+
+git push -u origin main
+
+
+Step 3: View Build on GitHub
+-----------------------------
+1. Visit: https://github.com/YOUR_USERNAME/autoai-android
+2. Click "Actions" tab
+3. Wait 3-5 minutes for build to complete
+4. Download APK from "Artifacts" section
+
+
+Future Updates
+--------------
+After modifying code, run:
+
+git add .
+git commit -m "Your commit message"
+git push
+
+
+Important Notes
+---------------
+- Replace YOUR_GITHUB_USERNAME with your actual username
+- Replace YOUR_EMAIL@example.com with your email
+- Replace YOUR_USERNAME in the repository URL
+
+If you get authentication error:
+- GitHub no longer accepts passwords
+- Use Personal Access Token (PAT) instead
+- Get token at: https://github.com/settings/tokens
+- Use token as password when prompted
+
+
+Need Help?
+----------
+- Quick Start: QUICK_START.md
+- Full Guide: GITHUB_DEPLOY_GUIDE.md
+- Fix Report: FIX_AND_OPTIMIZATION_REPORT.md

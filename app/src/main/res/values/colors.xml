@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launcher icon background - soft pink matching our theme -->
+    <color name="ic_launcher_background">#FFFBF8</color>
+    
+    <!-- Theme colors -->
+    <color name="purple_200">#FFB4BA</color>
+    <color name="purple_500">#FF9AA2</color>
+    <color name="purple_700">#8B5A60</color>
+    <color name="teal_200">#AAE3D7</color>
+    <color name="teal_700">#4A6B65</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <!-- 排除敏感数据 -->
+        <exclude domain="sharedpref" path="api_config.xml"/>
+        <exclude domain="sharedpref" path="sensitive_data.xml"/>
+    </cloud-backup>
+</data-extraction-rules>
