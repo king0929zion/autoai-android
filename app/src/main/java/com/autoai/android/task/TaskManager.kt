@@ -3,7 +3,7 @@ package com.autoai.android.task
 import com.autoai.android.data.model.Action
 import com.autoai.android.data.model.ActionResult
 import com.autoai.android.data.model.Task
-import com.autoai.android.data.model.Task.TaskStatus
+import com.autoai.android.data.model.TaskStatus
 import com.autoai.android.execution.ExecutionEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

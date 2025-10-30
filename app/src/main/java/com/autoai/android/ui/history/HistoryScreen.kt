@@ -17,6 +17,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoai.android.data.model.Task
+import com.autoai.android.data.model.TaskStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -227,9 +228,9 @@ fun HistoryTaskCard(
             Surface(
                 shape = MaterialTheme.shapes.medium,
                 color = when (task.status) {
-                    Task.TaskStatus.COMPLETED -> MaterialTheme.colorScheme.tertiaryContainer
-                    Task.TaskStatus.FAILED -> MaterialTheme.colorScheme.errorContainer
-                    Task.TaskStatus.CANCELLED -> MaterialTheme.colorScheme.surfaceVariant
+                    TaskStatus.COMPLETED -> MaterialTheme.colorScheme.tertiaryContainer
+                    TaskStatus.FAILED -> MaterialTheme.colorScheme.errorContainer
+                    TaskStatus.CANCELLED -> MaterialTheme.colorScheme.surfaceVariant
                     else -> MaterialTheme.colorScheme.secondaryContainer
                 },
                 modifier = Modifier.size(48.dp)
@@ -237,15 +238,15 @@ fun HistoryTaskCard(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         when (task.status) {
-                            Task.TaskStatus.COMPLETED -> Icons.Default.CheckCircle
-                            Task.TaskStatus.FAILED -> Icons.Default.Close
-                            Task.TaskStatus.CANCELLED -> Icons.Default.Delete
+                            TaskStatus.COMPLETED -> Icons.Default.CheckCircle
+                            TaskStatus.FAILED -> Icons.Default.Close
+                            TaskStatus.CANCELLED -> Icons.Default.Delete
                             else -> Icons.Default.Info
                         },
                         contentDescription = null,
                         tint = when (task.status) {
-                            Task.TaskStatus.COMPLETED -> MaterialTheme.colorScheme.onTertiaryContainer
-                            Task.TaskStatus.FAILED -> MaterialTheme.colorScheme.onErrorContainer
+                            TaskStatus.COMPLETED -> MaterialTheme.colorScheme.onTertiaryContainer
+                            TaskStatus.FAILED -> MaterialTheme.colorScheme.onErrorContainer
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
                     )
