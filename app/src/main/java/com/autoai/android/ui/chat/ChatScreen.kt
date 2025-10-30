@@ -28,7 +28,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoai.android.data.model.Task
-import com.autoai.android.data.model.Task.TaskStatus
+import com.autoai.android.data.model.TaskStatus
 import com.autoai.android.task.TaskManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
@@ -507,7 +507,7 @@ class ChatViewModel @Inject constructor(
                 val result = taskManager.executeTask(text) { task ->
                     // 更新任务进度
                     val progressContent = when (task.status) {
-                        com.autoai.android.data.model.Task.TaskStatus.RUNNING -> {
+                        TaskStatus.RUNNING -> {
                             if (task.currentStep > 0) {
                                 "⚡ 正在执行第 ${task.currentStep} 步..."
                             } else {
