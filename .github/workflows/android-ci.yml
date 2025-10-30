@@ -44,7 +44,7 @@ jobs:
     - name: Report Kotlin Errors
       if: failure() && steps.compile_debug.outcome == 'failure'
       run: |
-        tail -n 400 compile-debug.log | grep -E '(^\s*e:|^\s*w:|^> |^FAILURE:|^Caused by:)' > filtered.log || true
+        tail -n 400 compile-debug.log > filtered.log
         cat filtered.log
         while IFS= read -r line; do
           line=${line//'%'/'%25'}
