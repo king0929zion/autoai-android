@@ -1,0 +1,122 @@
+================================================
+  SAFE WAY TO PUSH TO GITHUB - Step by Step
+================================================
+
+IMPORTANT: Never commit tokens to Git!
+This guide shows you how to push safely.
+
+Step 1: Revoke Exposed Token (if any)
+--------------------------------------
+1. Go to: https://github.com/settings/tokens
+2. Find any exposed tokens
+3. Click "Delete" or "Revoke"
+
+
+Step 2: Generate New Token
+---------------------------
+1. Go to: https://github.com/settings/tokens
+2. Click "Generate new token (classic)"
+3. Settings:
+   - Note: AutoAI Android Push
+   - Expiration: 90 days
+   - Check: [x] repo (full repository access)
+4. Click "Generate token"
+5. COPY the token (shows only once!)
+6. Save it in a password manager
+
+DO NOT paste the token anywhere in code or files!
+
+
+Step 3: Push to GitHub (SAFE METHOD)
+-------------------------------------
+
+Option A: Let Git ask for token (RECOMMENDED)
+----------------------------------------------
+cd F:\autoaiAndroid
+
+git init
+git config --global user.name "YOUR_GITHUB_USERNAME"
+git config --global user.email "YOUR_EMAIL"
+git add .
+git commit -m "Initial commit: AutoAI Android v0.1.0-alpha"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/autoai-android.git
+
+git push -u origin main
+
+When prompted:
+- Username: YOUR_GITHUB_USERNAME
+- Password: PASTE_YOUR_TOKEN_HERE (not shown in this file for security!)
+
+Git will remember it for future use!
+
+
+Option B: Use GitHub Desktop (EASIEST)
+---------------------------------------
+1. Download: https://desktop.github.com/
+2. Install and sign in with GitHub
+3. File → Add Local Repository
+4. Select: F:\autoaiAndroid
+5. Publish repository
+6. Click "Push origin"
+
+No need to enter token manually!
+
+
+Option C: Use SSH (MOST SECURE)
+--------------------------------
+# Generate SSH key
+ssh-keygen -t ed25519 -C "YOUR_EMAIL"
+
+# Copy public key
+type %USERPROFILE%\.ssh\id_ed25519.pub
+
+# Add to GitHub
+1. Go to: https://github.com/settings/ssh/new
+2. Paste the public key
+3. Save
+
+# Use SSH URL
+git remote set-url origin git@github.com:YOUR_USERNAME/autoai-android.git
+git push -u origin main
+
+
+Step 4: Verify on GitHub
+-------------------------
+1. Visit: https://github.com/YOUR_USERNAME/autoai-android
+2. Click "Actions" tab
+3. Wait 3-5 minutes
+4. Download APK from "Artifacts"
+
+
+SECURITY RULES
+--------------
+NEVER:
+- Store token in files or scripts
+- Commit token to Git
+- Share token in chat/email
+- Use exposed token
+- Write token in plain text
+
+ALWAYS:
+- Use password manager
+- Revoke exposed tokens
+- Use environment variables
+- Let Git manage credentials
+
+
+WHAT TO DO IF TOKEN IS EXPOSED
+-------------------------------
+1. Revoke it immediately
+2. Generate new token
+3. Update saved credentials
+4. Review repository access logs
+
+
+Need Help?
+----------
+- GitHub Token Guide: https://docs.github.com/en/authentication
+- Git Credential Manager: https://github.com/git-ecosystem/git-credential-manager
+
+
+================================================

@@ -57,3 +57,8 @@ Thumbs.db
 # API Keys and sensitive data
 api_keys.txt
 secrets.properties
+
+# Local Git configuration (contains credentials)
+git_config_local.bat
+*.credentials
+*.token
