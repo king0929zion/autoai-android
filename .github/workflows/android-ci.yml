@@ -44,12 +44,12 @@ jobs:
     - name: Report Kotlin Errors
       if: failure() && steps.compile_debug.outcome == 'failure'
       run: |
-        tail -n 2000 compile-debug.log | perl -pe 's/\e\[[0-9;]*[A-Za-z]//g' > filtered.log
+        tail -n 10000 compile-debug.log | perl -pe 's/\e\[[0-9;]*[A-Za-z]//g' > filtered.log
         grep -E '(^\s*e:|^FAILURE:|^\* |^Caused by:|^BUILD FAILED)' filtered.log > critical.log || true
         if [ ! -s critical.log ]; then
           grep -E '(^> |^  [0-9]+\))' filtered.log > critical.log || true
         fi
-        head -n 20 critical.log > highlights.log
+        head -n 10 critical.log > highlights.log
         cat highlights.log
         while IFS= read -r line; do
           line=${line//'%'/'%25'}
