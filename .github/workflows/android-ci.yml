@@ -36,7 +36,21 @@ jobs:
           ${{ runner.os }}-gradle-
 
     - name: Compile Debug Kotlin
-      run: ./gradlew compileDebugKotlin --stacktrace
+      id: compile_debug
+      run: |
+        set -o pipefail
+        ./gradlew compileDebugKotlin --stacktrace | tee compile-debug.log
+
+    - name: Report Kotlin Errors
+      if: failure() && steps.compile_debug.outcome == 'failure'
+      run: |
+        tail -n 200 compile-debug.log | while IFS= read -r line; do
+          line=${line//'%'/'%25'}
+          line=${line//$'\r'/}
+          line=${line//':'/'%3A'}
+          line=${line//$'\n'/'%0A'}
+          echo "::error::$line"
+        done
 
     - name: Compile Release Kotlin
       run: ./gradlew compileReleaseKotlin --stacktrace
