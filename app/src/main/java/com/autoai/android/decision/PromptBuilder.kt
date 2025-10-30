@@ -6,7 +6,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 构建发往多模态大模型的系统/用户提示词。
+ * 负责组装发送给多模态大模型使用的系统提示词与用户提示词。
  */
 @Singleton
 class PromptBuilder @Inject constructor() {
@@ -18,7 +18,7 @@ class PromptBuilder @Inject constructor() {
     }
 
     fun buildSystemPrompt(): String = """
-你是一名专业的 Android 自动化助手，负责读取屏幕截图与控件树信息，规划出最安全、最高效的下一步操作。
+你是一名专业的 Android 自动化助手，负责读取屏幕截图与控件树信息，规划出安全且高效的下一步操作。
 
 ## 输出格式
 仅输出一个 JSON 对象，不要附带任何解释。示例：
@@ -33,16 +33,16 @@ class PromptBuilder @Inject constructor() {
 4. 输入文本：`{"action":"input","text":"要输入的内容"}` —— 输入前请先点击输入框
 5. 模拟按键：`{"action":"press_key","key_code":4}`（常用：返回=4，Home=3，最近任务=187）
 6. 启动应用：`{"action":"open_app","package":"com.tencent.mm"}`
-7. 等待：`{"action":"wait","duration":1500}`（等待界面加载）
+7. 等待：`{"action":"wait","duration":1500}`（用于等待界面加载）
 8. 返回：`{"action":"go_back"}`
 9. 任务完成：`{"action":"complete","message":"说明文字"}`
 10. 无法处理：`{"action":"error","message":"原因说明"}`
 
 ## 决策要求
-- 仔细阅读提供的控件、文本、历史操作。
+- 仔细阅读控件、文本与历史操作信息。
 - 一次只执行一个动作，必要时先点击再输入。
 - 坐标必须在屏幕范围内，优先选择带标签的控件中心坐标。
-- 遇到权限弹窗/安全提示，请优先处理。
+- 遇到权限弹窗或安全提示，请优先处理。
 - 若任务已完成或需要人工介入，请使用 `complete` 或 `error` 行为告知。
 """.trimIndent()
 
@@ -58,7 +58,7 @@ class PromptBuilder @Inject constructor() {
         appendLine("## 屏幕信息")
         appendLine("前台应用: ${screenState.currentApp}")
         appendLine("屏幕尺寸: ${screenState.screenWidth} x ${screenState.screenHeight}")
-        appendLine("截图已附带，以 data URI 形式提供给模型。")
+        appendLine("截图已附带（以 data URI 形式提供给模型）。")
         appendLine()
 
         if (screenState.description.isNotBlank()) {
@@ -82,7 +82,7 @@ class PromptBuilder @Inject constructor() {
                 )
             }
             if (screenState.uiElements.size > MAX_ELEMENTS) {
-                appendLine("… 其余 ${screenState.uiElements.size - MAX_ELEMENTS} 个元素已省略")
+                appendLine("…其余 ${screenState.uiElements.size - MAX_ELEMENTS} 个元素已省略")
             }
             appendLine()
         }
@@ -92,7 +92,7 @@ class PromptBuilder @Inject constructor() {
             appendLine("## 屏幕文本（最多 $MAX_TEXT_LINES 条）")
             texts.take(MAX_TEXT_LINES).forEach { appendLine("- $it") }
             if (texts.size > MAX_TEXT_LINES) {
-                appendLine("… 其余 ${texts.size - MAX_TEXT_LINES} 条文本已省略")
+                appendLine("…其余 ${texts.size - MAX_TEXT_LINES} 条文本已省略")
             }
             appendLine()
         }
@@ -104,7 +104,7 @@ class PromptBuilder @Inject constructor() {
         }
 
         appendLine("## 决策指令")
-        appendLine("请结合截图、控件树与历史操作，输出一个 JSON 对象，描述下一步要执行的动作，不要附加其他文本。")
+        appendLine("请结合截图、控件树与历史操作，输出一个 JSON 对象描述下一步动作，不要附加其他文本。")
     }
 
     fun buildSimplePrompt(task: String, currentApp: String): String = """
@@ -131,7 +131,7 @@ $errorMessage
 ## 当前屏幕概览
 ${screenState.description.ifBlank { "未提供文字描述，请结合截图分析。" }}
 
-请给出一条 JSON 操作指令，用于恢复或继续任务。
+请给出一个 JSON 操作指令，用于恢复或继续任务。
 """.trimIndent()
 
     private fun formatAction(action: Action): String = when (action) {
@@ -142,7 +142,7 @@ ${screenState.description.ifBlank { "未提供文字描述，请结合截图分�
         is Action.PressKey -> "按键: ${action.keyCode}"
         is Action.OpenApp -> "打开应用: ${action.packageName}"
         is Action.Wait -> "等待 ${action.durationMs}ms"
-        is Action.GoBack -> "返回上一层"
+        is Action.GoBack -> "返回上一页"
         is Action.Complete -> "任务完成: ${action.message}"
         is Action.Error -> "任务错误: ${action.message}"
         is Action.RequestUserHelp -> "请求人工协助: ${action.reason}"
