@@ -42,13 +42,26 @@ class ScreenCapture @Inject constructor(
             Timber.d("开始捕获屏幕...")
             
             // 使用 Shizuku 执行 screencap 命令
-            val process = Runtime.getRuntime().exec("screencap -p")
+            val process = try {
+                Shizuku.newProcess(arrayOf("screencap", "-p"), null, null)
+            } catch (e: Exception) {
+                Timber.e(e, "无法创建Shizuku进程")
+                return@withContext Result.failure(Exception("创建截图进程失败: ${e.message}"))
+            }
             
             // 增加超时检查
             val hasFinished = process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
             if (!hasFinished) {
                 process.destroy()
                 return@withContext Result.failure(Exception("截图超时"))
+            }
+            
+            // 检查退出码
+            val exitCode = process.exitValue()
+            if (exitCode != 0) {
+                val error = process.errorStream.bufferedReader().use { it.readText() }
+                Timber.e("截图命令失败: exitCode=$exitCode, error=$error")
+                return@withContext Result.failure(Exception("截图失败: $error"))
             }
             
             // 读取输出流为 Bitmap
@@ -61,7 +74,7 @@ class ScreenCapture @Inject constructor(
                 Result.success(bitmap)
             } else {
                 Timber.e("截图失败: Bitmap 为 null")
-                Result.failure(Exception("截图失败"))
+                Result.failure(Exception("无法解码截图数据"))
             }
         } catch (e: Exception) {
             Timber.e(e, "截图捕获异常")

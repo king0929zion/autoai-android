@@ -156,7 +156,13 @@ class OperationExecutor @Inject constructor(
     }
 
     private fun executeShellCommand(command: String): ShellResult = runCatching {
-        val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
+        val process = try {
+            Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
+        } catch (e: Exception) {
+            Timber.e(e, "无法创建Shizuku进程")
+            return@runCatching ShellResult(false, "", "创建进程失败: ${e.message}")
+        }
+        
         val stdout = BufferedReader(InputStreamReader(process.inputStream)).use { it.readText() }
         val stderr = BufferedReader(InputStreamReader(process.errorStream)).use { it.readText() }
         val exitCode = process.waitFor()
