@@ -1,18 +1,20 @@
-package com.autoai.android.utils
+﻿package com.autoai.android.utils
 
 import rikka.shizuku.Shizuku
 import timber.log.Timber
+import java.io.ByteArrayOutputStream
 import java.lang.reflect.Method
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
- * 使用 Shizuku 执行 Shell 命令，提供统一的结果封装与超时处理。
+ * Execute shell commands via Shizuku with unified result wrapping and timeout handling.
  */
 object ShizukuShell {
 
     private val streamCharset: Charset = Charsets.ISO_8859_1
+    private val errorStreamCharset: Charset = Charsets.UTF_8
 
     private val newProcessMethod: Method by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
         Shizuku::class.java.getDeclaredMethod(
@@ -31,34 +33,34 @@ object ShizukuShell {
 
     private fun runCommand(timeoutSeconds: Long?, command: Array<out String>): ShellResult {
         if (command.isEmpty()) {
-            Timber.w("尝试执行空命令")
-            return ShellResult(isSuccess = false, output = "", errorMessage = "命令不能为空")
+            Timber.w("Attempted to execute empty command")
+            return ShellResult(isSuccess = false, output = "", errorMessage = "Command cannot be empty")
         }
 
         val commandLine = command.joinToString(" ")
         return try {
             val process = spawnProcess(command)
             try {
-                val stdoutBuilder = StringBuilder()
-                val stderrBuilder = StringBuilder()
+                val stdoutBuffer = ByteArrayOutputStream()
+                val stderrBuffer = ByteArrayOutputStream()
 
                 val stdoutThread = thread(start = true, isDaemon = true, name = "ShizukuShell-stdout") {
                     runCatching {
-                        process.inputStream.bufferedReader(streamCharset).use { reader ->
-                            stdoutBuilder.append(reader.readText())
+                        process.inputStream.use { input ->
+                            input.copyTo(stdoutBuffer)
                         }
                     }.onFailure {
-                        Timber.w(it, "读取命令输出失败: $commandLine")
+                        Timber.w(it, "Failed to read command standard output: $commandLine")
                     }
                 }
 
                 val stderrThread = thread(start = true, isDaemon = true, name = "ShizukuShell-stderr") {
                     runCatching {
-                        process.errorStream.bufferedReader(streamCharset).use { reader ->
-                            stderrBuilder.append(reader.readText())
+                        process.errorStream.use { input ->
+                            input.copyTo(stderrBuffer)
                         }
                     }.onFailure {
-                        Timber.w(it, "读取命令错误输出失败: $commandLine")
+                        Timber.w(it, "Failed to read command error output: $commandLine")
                     }
                 }
 
@@ -70,30 +72,38 @@ object ShizukuShell {
                 }
 
                 if (!finished) {
-                    Timber.w("命令执行超时: $commandLine (timeout=${timeoutSeconds}s)")
+                    Timber.w("Command timed out: $commandLine (timeout=${timeoutSeconds}s)")
                     process.destroy()
-                    process.inputStream.close()
-                    process.errorStream.close()
+                    runCatching { process.inputStream.close() }
+                    runCatching { process.errorStream.close() }
                     stdoutThread.join(200)
                     stderrThread.join(200)
-                    return ShellResult(isSuccess = false, output = "", errorMessage = "命令执行超时")
+                    return ShellResult(isSuccess = false, output = "", errorMessage = "Command timed out")
                 }
 
                 stdoutThread.join()
                 stderrThread.join()
 
-                val exitCode = process.exitValue()
-                val stdout = stdoutBuilder.toString()
-                val stderr = stderrBuilder.toString()
+                val stdoutBytes = stdoutBuffer.toByteArray()
+                val stderrBytes = stderrBuffer.toByteArray()
+                val stdout = stdoutBytes.toString(streamCharset)
+                val stderr = stderrBytes.toString(errorStreamCharset)
 
+                val exitCode = process.exitValue()
                 if (exitCode == 0) {
-                    ShellResult(isSuccess = true, output = stdout, errorMessage = "")
+                    ShellResult(
+                        isSuccess = true,
+                        output = stdout,
+                        errorMessage = "",
+                        rawOutput = stdoutBytes
+                    )
                 } else {
-                    Timber.w("命令执行失败: $commandLine, exitCode=$exitCode")
+                    Timber.w("Command failed: $commandLine, exitCode=$exitCode")
                     ShellResult(
                         isSuccess = false,
                         output = stdout,
-                        errorMessage = stderr.ifBlank { "命令执行失败 (exitCode=$exitCode)" }
+                        errorMessage = stderr.ifBlank { "Command failed (exitCode=$exitCode)" },
+                        rawOutput = stdoutBytes
                     )
                 }
             } finally {
@@ -102,8 +112,8 @@ object ShizukuShell {
                 }
             }
         } catch (e: Exception) {
-            Timber.e(e, "执行Shell命令异常: $commandLine")
-            ShellResult(isSuccess = false, output = "", errorMessage = e.message ?: "未知错误")
+            Timber.e(e, "Shell command execution error: $commandLine")
+            ShellResult(isSuccess = false, output = "", errorMessage = e.message ?: "Unknown error")
         }
     }
 
@@ -117,5 +127,6 @@ object ShizukuShell {
 data class ShellResult(
     val isSuccess: Boolean,
     val output: String,
-    val errorMessage: String
+    val errorMessage: String,
+    val rawOutput: ByteArray = ByteArray(0)
 )

@@ -40,38 +40,19 @@ class ScreenCapture @Inject constructor(
             }
 
             Timber.d("开始捕获屏幕...")
-            
-            // 使用临时文件保存截图
-            val tempFile = "/sdcard/autoai_screenshot.png"
-            
-            // 执行截图命令
-            val result = ShizukuShell.executeCommandWithTimeout(10, "screencap", "-p", tempFile)
-            
-            if (!result.isSuccess) {
-                Timber.e("截图命令失败: ${result.errorMessage}")
-                return@withContext Result.failure(Exception("截图失败: ${result.errorMessage}"))
+            val captureResult = ShizukuShell.executeCommandWithTimeout(12, "screencap", "-p")
+
+            if (!captureResult.isSuccess || captureResult.rawOutput.isEmpty()) {
+                val reason = captureResult.errorMessage.ifBlank { "命令执行失败" }
+                Timber.e("截图命令失败: $reason")
+                return@withContext Result.failure(Exception("截图失败: $reason"))
             }
-            
-            // 读取截图文件
-            val readResult = ShizukuShell.executeCommand("cat", tempFile)
-            
-            if (!readResult.isSuccess) {
-                Timber.e("读取截图文件失败: ${readResult.errorMessage}")
-                return@withContext Result.failure(Exception("读取截图失败: ${readResult.errorMessage}"))
-            }
-            
-            // 删除临时文件
-            ShizukuShell.executeCommand("rm", tempFile)
-            
-            // 将输出转换为Bitmap
-            val bitmap = try {
-                BitmapFactory.decodeByteArray(
-                    readResult.output.toByteArray(Charsets.ISO_8859_1),
-                    0,
-                    readResult.output.length
-                )
-            } catch (e: Exception) {
-                Timber.e(e, "解码截图数据失败")
+
+            val screenshotBytes = captureResult.rawOutput
+            val bitmap = runCatching {
+                BitmapFactory.decodeByteArray(screenshotBytes, 0, screenshotBytes.size)
+            }.getOrElse { error ->
+                Timber.e(error, "解码截图数据失败")
                 null
             }
             

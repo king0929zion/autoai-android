@@ -22,7 +22,7 @@ class ViewHierarchyAnalyzer @Inject constructor(
     private val shizukuManager: ShizukuManager
 ) {
     companion object {
-        private const val DUMP_DIR = "/sdcard/AutoAI"
+        private const val DUMP_DIR = "/data/local/tmp/autoai"
         private const val DUMP_FILE = "$DUMP_DIR/window_dump.xml"
     }
 
@@ -117,6 +117,7 @@ class ViewHierarchyAnalyzer @Inject constructor(
     private fun dumpWindowHierarchy() {
         Timber.d("执行 uiautomator dump")
 
+        ShizukuShell.executeCommand("rm", "-f", DUMP_FILE)
         val result = ShizukuShell.executeCommandWithTimeout(15, "uiautomator", "dump", DUMP_FILE)
         if (!result.isSuccess) {
             throw IllegalStateException("uiautomator dump 执行失败: ${result.errorMessage}")

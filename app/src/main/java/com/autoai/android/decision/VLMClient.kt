@@ -28,6 +28,8 @@ class VLMClient @Inject constructor() {
         private const val DEFAULT_TEMPERATURE = 0.3f
         private const val DEFAULT_MAX_TOKENS = 2000
         private const val TIMEOUT_SECONDS = 60L
+        private const val TEST_SYSTEM_PROMPT = "你是一个用于健康检查的助手，只需判断服务是否可用。"
+        private const val TEST_USER_PROMPT = "请仅回复“OK”。"
     }
 
     private val httpClient: OkHttpClient = OkHttpClient.Builder()
@@ -146,6 +148,37 @@ class VLMClient @Inject constructor() {
             response.choices.first().message.content
         }.onFailure { Timber.e(it, "VLM 文本调用失败") }
     }
+
+    suspend fun testConnection(
+        temperature: Float = DEFAULT_TEMPERATURE,
+        maxTokens: Int = 64
+    ): Result<ConnectionDiagnostics> = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("尚未配置 API Key"))
+        }
+
+        val sanitizedTemp = temperature.coerceIn(0f, 1f)
+        val sanitizedTokens = maxTokens.coerceIn(16, 512)
+        val start = System.currentTimeMillis()
+
+        return@withContext chatText(
+            systemPrompt = TEST_SYSTEM_PROMPT,
+            userPrompt = TEST_USER_PROMPT,
+            temperature = sanitizedTemp,
+            maxTokens = sanitizedTokens
+        ).map { response ->
+            val latency = System.currentTimeMillis() - start
+            ConnectionDiagnostics(
+                latencyMs = latency,
+                responsePreview = response.replace("\n", " ").take(64)
+            )
+        }
+    }
+
+    data class ConnectionDiagnostics(
+        val latencyMs: Long,
+        val responsePreview: String
+    )
 
     private fun createService(baseUrl: String): VLMApiService {
         val retrofit = Retrofit.Builder()

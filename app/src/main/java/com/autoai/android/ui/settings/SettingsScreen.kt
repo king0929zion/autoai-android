@@ -7,6 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -23,7 +24,9 @@ import com.autoai.android.decision.VLMClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
@@ -42,6 +45,7 @@ fun SettingsScreen(
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val isSaved by viewModel.isSaved.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val apiTestState by viewModel.apiTestState.collectAsState()
 
     Scaffold(
         topBar = {
@@ -142,6 +146,61 @@ fun SettingsScreen(
                     valueRange = 100f..4000f,
                     steps = 39
                 )
+            }
+
+            Button(
+                onClick = viewModel::testApiConnection,
+                enabled = apiTestState !is ApiTestState.Loading,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                if (apiTestState is ApiTestState.Loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(18.dp)
+                            .padding(end = 12.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Text("测试中...")
+                } else {
+                    Text("测试 API 连接")
+                }
+            }
+
+            when (apiTestState) {
+                is ApiTestState.Success -> {
+                    val state = apiTestState as ApiTestState.Success
+                    AssistChip(
+                        onClick = {},
+                        leadingIcon = {
+                            Icon(Icons.Default.Check, contentDescription = null)
+                        },
+                        label = {
+                            Text("连接正常 (${state.latencyMs}ms)")
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            labelColor = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                    )
+                    if (state.responsePreview.isNotBlank()) {
+                        Text(
+                            text = "模型响应预览：${state.responsePreview}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
+                }
+                is ApiTestState.Failure -> {
+                    val state = apiTestState as ApiTestState.Failure
+                    Text(
+                        text = state.message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+                else -> Unit
             }
             
             Divider(modifier = Modifier.padding(vertical = 8.dp))
@@ -355,6 +414,9 @@ class SettingsViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
+    private val _apiTestState = MutableStateFlow<ApiTestState>(ApiTestState.Idle)
+    val apiTestState: StateFlow<ApiTestState> = _apiTestState.asStateFlow()
+
     init {
         loadSettings()
     }
@@ -377,28 +439,33 @@ class SettingsViewModel @Inject constructor(
         _apiKey.value = value
         _isSaved.value = false
         _errorMessage.value = null
+        resetApiTestState()
     }
 
     fun updateBaseUrl(value: String) {
         _baseUrl.value = value
         _isSaved.value = false
         _errorMessage.value = null
+        resetApiTestState()
     }
 
     fun updateModelName(value: String) {
         _modelName.value = value
         _isSaved.value = false
         _errorMessage.value = null
+        resetApiTestState()
     }
     
     fun updateTemperature(value: Float) {
         _temperature.value = value
         _isSaved.value = false
+        resetApiTestState()
     }
     
     fun updateMaxTokens(value: Int) {
         _maxTokens.value = value
         _isSaved.value = false
+        resetApiTestState()
     }
     
     fun updateDarkTheme(value: Boolean) {
@@ -446,8 +513,49 @@ class SettingsViewModel @Inject constructor(
                 
                 _isSaved.value = true
                 _errorMessage.value = null
+                resetApiTestState()
             } catch (e: Exception) {
                 _errorMessage.value = "保存失败: ${e.message}"
+            }
+        }
+    }
+    
+    fun testApiConnection() {
+        if (_apiKey.value.isBlank()) {
+            _apiTestState.value = ApiTestState.Failure("请先填写 API Key")
+            return
+        }
+        if (_baseUrl.value.isBlank()) {
+            _apiTestState.value = ApiTestState.Failure("API 基础 URL 不能为空")
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _apiTestState.value = ApiTestState.Loading
+                vlmClient.configure(
+                    apiKey = _apiKey.value,
+                    baseUrl = _baseUrl.value,
+                    modelName = _modelName.value
+                )
+
+                val result = vlmClient.testConnection(
+                    temperature = _temperature.value,
+                    maxTokens = _maxTokens.value
+                )
+                result.onSuccess { diagnostics ->
+                    _apiTestState.value = ApiTestState.Success(
+                        latencyMs = diagnostics.latencyMs,
+                        responsePreview = diagnostics.responsePreview
+                    )
+                }.onFailure { error ->
+                    val message = error.message ?: "连接失败，请稍后重试"
+                    Timber.w(error, "API 连接测试失败")
+                    _apiTestState.value = ApiTestState.Failure(message)
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "API 连接测试异常")
+                _apiTestState.value = ApiTestState.Failure(e.message ?: "连接测试异常")
             }
         }
     }
@@ -455,4 +563,15 @@ class SettingsViewModel @Inject constructor(
     fun clearError() {
         _errorMessage.value = null
     }
+
+    private fun resetApiTestState() {
+        _apiTestState.value = ApiTestState.Idle
+    }
+}
+
+sealed class ApiTestState {
+    object Idle : ApiTestState()
+    object Loading : ApiTestState()
+    data class Success(val latencyMs: Long, val responsePreview: String) : ApiTestState()
+    data class Failure(val message: String) : ApiTestState()
 }
