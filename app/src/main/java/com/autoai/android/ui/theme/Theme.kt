@@ -213,9 +213,10 @@ fun AutoAITheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            // 使用透明状态栏以获得沉浸式体验
-            window.statusBarColor = android.graphics.Color.TRANSPARENT
-            window.navigationBarColor = colorScheme.surface.toArgb()
+            // 将状态栏与顶部栏保持一致的色调，减少色差
+            val surfaceColor = colorScheme.surface.toArgb()
+            window.statusBarColor = surfaceColor
+            window.navigationBarColor = surfaceColor
             
             val insetsController = WindowCompat.getInsetsController(window, view)
             insetsController.isAppearanceLightStatusBars = !darkTheme
