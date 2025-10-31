@@ -1,9 +1,8 @@
-﻿package com.autoai.android.ui.chat
+package com.autoai.android.ui.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -88,10 +87,19 @@ fun ChatScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = "AI 自动控机",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-                    )
+                    Column {
+                        Text(
+                            text = "AI 自动控机",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        )
+                        if (isProcessing) {
+                            Text(
+                                text = "正在执行任务…",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
                 },
                 actions = {
                     IconButton(onClick = onNavigateToHelp) {
@@ -179,8 +187,7 @@ private fun QuickActionRow(
         items(actions) { action ->
             Surface(
                 shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                tonalElevation = 2.dp
+                color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Text(
                     text = action.label,
@@ -189,7 +196,7 @@ private fun QuickActionRow(
                     modifier = Modifier
                         .clip(RoundedCornerShape(24.dp))
                         .clickable { onActionSelected(action.command) }
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
         }
@@ -261,27 +268,33 @@ private fun MessageBubble(message: ChatMessage) {
             color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
             tonalElevation = if (isUser) 4.dp else 0.dp
         ) {
-            Box(
-                modifier = Modifier
-                    .background(
-                        if (isUser) Brush.verticalGradient(
-                            listOf(
-                                MaterialTheme.colorScheme.primary,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-                            )
-                        ) else Color.Transparent,
-                        bubbleShape
-                    )
+            val gradientBrush = Brush.verticalGradient(
+                colors = listOf(
+                    MaterialTheme.colorScheme.primary,
+                    MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                )
+            )
+
+            val contentModifier = if (isUser) {
+                Modifier
+                    .clip(bubbleShape)
+                    .background(gradientBrush)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
+            } else {
+                Modifier
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            }
+
+            Column(
+                modifier = contentModifier,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = message.content,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                    )
-                    message.task?.let { TaskStatusCard(it) }
-                }
+                Text(
+                    text = message.content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                )
+                message.task?.let { TaskStatusCard(it) }
             }
         }
 
