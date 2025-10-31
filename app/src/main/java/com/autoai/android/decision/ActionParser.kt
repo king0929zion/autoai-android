@@ -28,39 +28,41 @@ class ActionParser @Inject constructor() {
      * @param response AI 响应内容
      * @return Action 对象，如果解析失败返回错误
      */
-    fun parse(response: String): Result<Action> = try {
-        Timber.d("开始解析 AI 响应: ${response.take(200)}")
+    fun parse(response: String): Result<Action> {
+        return try {
+            Timber.d("开始解析 AI 响应: ${response.take(200)}")
 
-        // 提取 JSON（有时 AI 会返回带说明的文本）
-        val jsonString = extractJson(response)
-        if (jsonString.isEmpty()) {
-            return Result.failure(Exception("未找到有效的 JSON"))
-        }
-
-        val jsonObject = JsonParser.parseString(jsonString).asJsonObject
-
-        val action = when (val actionType = jsonObject.get("action")?.asString) {
-            "click" -> parseClick(jsonObject)
-            "long_click" -> parseLongClick(jsonObject)
-            "swipe" -> parseSwipe(jsonObject)
-            "input" -> parseInput(jsonObject)
-            "press_key" -> parsePressKey(jsonObject)
-            "open_app" -> parseOpenApp(jsonObject)
-            "wait" -> parseWait(jsonObject)
-            "go_back" -> Action.GoBack
-            "complete" -> parseComplete(jsonObject)
-            "error" -> parseError(jsonObject)
-            else -> {
-                Timber.w("未知的动作类型: $actionType")
-                Action.Error("未知的动作类型: $actionType")
+            // 提取 JSON（有时 AI 会返回带说明的文本）
+            val jsonString = extractJson(response)
+            if (jsonString.isEmpty()) {
+                return Result.failure(Exception("未找到有效的 JSON"))
             }
-        }
 
-        Timber.d("解析成功: ${action::class.simpleName}")
-        Result.success(action)
-    } catch (e: Exception) {
-        Timber.e(e, "解析 AI 响应失败")
-        Result.failure(e)
+            val jsonObject = JsonParser.parseString(jsonString).asJsonObject
+
+            val action = when (val actionType = jsonObject.get("action")?.asString) {
+                "click" -> parseClick(jsonObject)
+                "long_click" -> parseLongClick(jsonObject)
+                "swipe" -> parseSwipe(jsonObject)
+                "input" -> parseInput(jsonObject)
+                "press_key" -> parsePressKey(jsonObject)
+                "open_app" -> parseOpenApp(jsonObject)
+                "wait" -> parseWait(jsonObject)
+                "go_back" -> Action.GoBack
+                "complete" -> parseComplete(jsonObject)
+                "error" -> parseError(jsonObject)
+                else -> {
+                    Timber.w("未知的动作类型: $actionType")
+                    Action.Error("未知的动作类型: $actionType")
+                }
+            }
+
+            Timber.d("解析成功: ${action::class.simpleName}")
+            Result.success(action)
+        } catch (e: Exception) {
+            Timber.e(e, "解析 AI 响应失败")
+            Result.failure(e)
+        }
     }
 
     /**

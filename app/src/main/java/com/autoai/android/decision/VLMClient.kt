@@ -1,5 +1,6 @@
 package com.autoai.android.decision
 
+import com.autoai.android.BuildConfig
 import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

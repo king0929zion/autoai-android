@@ -156,7 +156,7 @@ class OperationExecutor @Inject constructor(
     }
 
     private fun executeShellCommand(command: String): ShellResult = runCatching {
-        val process = Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
+        val process = Runtime.getRuntime().exec(arrayOf("sh", "-c", command))
         val stdout = BufferedReader(InputStreamReader(process.inputStream)).use { it.readText() }
         val stderr = BufferedReader(InputStreamReader(process.errorStream)).use { it.readText() }
         val exitCode = process.waitFor()

@@ -29,108 +29,114 @@ class TaskManager @Inject constructor(
     suspend fun executeTask(
         description: String,
         onProgress: ((Task) -> Unit)? = null
-    ): Result<String> = runCatching {
-        var task = Task(
-            id = UUID.randomUUID().toString(),
-            description = description,
-            status = TaskStatus.RUNNING,
-            createdAt = System.currentTimeMillis(),
-            startedAt = System.currentTimeMillis()
-        )
-        _currentTask.value = task
-        Timber.d("任务开始: %s - %s", task.id, description)
-
-        val result = executionEngine.executeTask(
-            taskDescription = description,
-            maxSteps = 30
-        ) { step, action, actionResult ->
-            val actionHistory = Task.ActionHistory(
-                step = step,
-                action = action,
-                result = actionResult,
-                timestamp = System.currentTimeMillis()
-            )
-            task = task.copy(
-                currentStep = step,
-                history = task.history + actionHistory
+    ): Result<String> {
+        return try {
+            var task = Task(
+                id = UUID.randomUUID().toString(),
+                description = description,
+                status = TaskStatus.RUNNING,
+                createdAt = System.currentTimeMillis(),
+                startedAt = System.currentTimeMillis()
             )
             _currentTask.value = task
-            onProgress?.invoke(task)
-            Timber.d("任务进度: step=%d action=%s", step, action::class.simpleName)
-        }
+            Timber.d("任务开始: %s - %s", task.id, description)
 
-        task = if (result.isSuccess) {
-            task.copy(
-                status = TaskStatus.COMPLETED,
-                completedAt = System.currentTimeMillis(),
-                result = result.getOrNull()
-            )
-        } else {
-            task.copy(
+            val result = executionEngine.executeTask(
+                taskDescription = description,
+                maxSteps = 30
+            ) { step, action, actionResult ->
+                val actionHistory = Task.ActionHistory(
+                    step = step,
+                    action = action,
+                    result = actionResult,
+                    timestamp = System.currentTimeMillis()
+                )
+                task = task.copy(
+                    currentStep = step,
+                    history = task.history + actionHistory
+                )
+                _currentTask.value = task
+                onProgress?.invoke(task)
+                Timber.d("任务进度: step=%d action=%s", step, action::class.simpleName)
+            }
+
+            task = if (result.isSuccess) {
+                task.copy(
+                    status = TaskStatus.COMPLETED,
+                    completedAt = System.currentTimeMillis(),
+                    result = result.getOrNull()
+                )
+            } else {
+                task.copy(
+                    status = TaskStatus.FAILED,
+                    completedAt = System.currentTimeMillis(),
+                    error = result.exceptionOrNull()?.message
+                )
+            }
+
+            _currentTask.value = task
+            taskHistory.add(task)
+            Timber.d("任务结束: %s 状态=%s", task.id, task.status)
+
+            result
+        } catch (error: Exception) {
+            Timber.e(error, "任务执行异常")
+            _currentTask.value = _currentTask.value?.copy(
                 status = TaskStatus.FAILED,
                 completedAt = System.currentTimeMillis(),
-                error = result.exceptionOrNull()?.message
+                error = error.message
             )
+            Result.failure(error)
         }
-
-        _currentTask.value = task
-        taskHistory.add(task)
-        Timber.d("任务结束: %s 状态=%s", task.id, task.status)
-
-        result
-    }.onFailure { error ->
-        Timber.e(error, "任务执行异常")
-        _currentTask.value = _currentTask.value?.copy(
-            status = TaskStatus.FAILED,
-            completedAt = System.currentTimeMillis(),
-            error = error.message
-        )
     }
 
-    suspend fun executeSingleTask(description: String): Result<ActionResult> = runCatching {
-        var task = Task(
-            id = UUID.randomUUID().toString(),
-            description = description,
-            status = TaskStatus.RUNNING,
-            createdAt = System.currentTimeMillis(),
-            startedAt = System.currentTimeMillis()
-        )
-        _currentTask.value = task
+    suspend fun executeSingleTask(description: String): Result<ActionResult> {
+        return try {
+            var task = Task(
+                id = UUID.randomUUID().toString(),
+                description = description,
+                status = TaskStatus.RUNNING,
+                createdAt = System.currentTimeMillis(),
+                startedAt = System.currentTimeMillis()
+            )
+            _currentTask.value = task
 
-        val result = executionEngine.executeSingleStep(description)
-        task = if (result.isSuccess) {
-            val action = executionEngine.getHistory().lastOrNull() ?: Action.Error("未记录动作")
-            task.copy(
-                status = TaskStatus.COMPLETED,
-                completedAt = System.currentTimeMillis(),
-                currentStep = 1,
-                history = listOf(
-                    Task.ActionHistory(
-                        step = 1,
-                        action = action,
-                        result = result.getOrThrow(),
-                        timestamp = System.currentTimeMillis()
+            val result = executionEngine.executeSingleStep(description)
+            task = if (result.isSuccess) {
+                val action = executionEngine.getHistory().lastOrNull() ?: Action.Error("未记录动作")
+                task.copy(
+                    status = TaskStatus.COMPLETED,
+                    completedAt = System.currentTimeMillis(),
+                    currentStep = 1,
+                    history = listOf(
+                        Task.ActionHistory(
+                            step = 1,
+                            action = action,
+                            result = result.getOrThrow(),
+                            timestamp = System.currentTimeMillis()
+                        )
                     )
                 )
-            )
-        } else {
-            task.copy(
+            } else {
+                task.copy(
+                    status = TaskStatus.FAILED,
+                    completedAt = System.currentTimeMillis(),
+                    error = result.exceptionOrNull()?.message
+                )
+            }
+
+            _currentTask.value = task
+            taskHistory.add(task)
+            result
+        } catch (error: Exception) {
+            Timber.e(error, "单步任务执行异常")
+            _currentTask.value = _currentTask.value?.copy(
                 status = TaskStatus.FAILED,
                 completedAt = System.currentTimeMillis(),
-                error = result.exceptionOrNull()?.message
+                error = error.message
             )
+            Result.failure(error)
         }
-
-        _currentTask.value = task
-        taskHistory.add(task)
-        result
-    }.onFailure { error ->
-        Timber.e(error, "单步任务执行异常")
-        _currentTask.value = _currentTask.value?.copy(
-            status = TaskStatus.FAILED,
-            completedAt = System.currentTimeMillis(),
-            error = error.message
-        )
     }
 
     fun pauseTask() {

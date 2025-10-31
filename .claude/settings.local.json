@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "Bash(./gradlew.bat build:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(gradlew.bat app:compileDebugKotlin:*)",
+      "Bash(cmd /c:*)",
+      "Bash(dir:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"Fix: Update Compose Compiler to 1.5.8 for Kotlin 1.9.22 compatibility\n\n$(cat <<''EOF''\nKotlin 1.9.22 requires Compose Compiler 1.5.8 according to the official compatibility matrix.\nThe previous version 1.5.10 is for Kotlin 1.9.23+.\n\nReference: https://developer.android.com/jetpack/androidx/releases/compose-kotlin\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "WebFetch(domain:github.com)",
+      "Read(//f/**)",
+      "WebSearch",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

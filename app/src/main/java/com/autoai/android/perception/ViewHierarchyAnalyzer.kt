@@ -110,7 +110,7 @@ class ViewHierarchyAnalyzer @Inject constructor(
 
     private fun dumpWindowHierarchy() {
         Timber.d("执行 uiautomator dump")
-        val process = Shizuku.newProcess(arrayOf("sh", "-c", "uiautomator dump $DUMP_FILE"), null, null)
+        val process = Runtime.getRuntime().exec("uiautomator dump $DUMP_FILE")
         
         // 增加超时检查
         val hasFinished = process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)

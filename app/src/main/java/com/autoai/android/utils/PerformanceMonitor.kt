@@ -42,7 +42,8 @@ object PerformanceMonitor {
     /**
      * 记录时间
      */
-    private fun recordTiming(tag: String, duration: Long) {
+    @PublishedApi
+    internal fun recordTiming(tag: String, duration: Long) {
         timings.getOrPut(tag) { mutableListOf() }.add(duration)
     }
     
