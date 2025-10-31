@@ -5,7 +5,9 @@ import com.autoai.android.data.model.Action
 import com.autoai.android.data.model.ActionResult
 import com.autoai.android.utils.ShizukuShell
 import com.autoai.android.utils.ShellResult
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
