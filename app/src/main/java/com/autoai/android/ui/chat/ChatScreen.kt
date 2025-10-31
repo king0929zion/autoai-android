@@ -372,7 +372,7 @@ class ChatViewModel @Inject constructor(
         listOf(
             ChatMessage(
                 id = "welcome",
-                content = "你好！我是 AI 自动控机助手。\n\n可以告诉我需要完成的任务，例如：\n• 打开微信\n• 在浏览器搜索内容\n• 截图并保存\n\n提示：复杂任务建议拆分为多个步骤。",
+                content = "你好！我是 AI 自动控机助手。\n\n请直接描述你想完成的事情，我会尽力协助。\n\n提示：复杂任务建议拆分为多个步骤，以便更高效地执行。",
                 isUser = false
             )
         )

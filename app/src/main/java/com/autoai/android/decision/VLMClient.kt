@@ -52,9 +52,19 @@ class VLMClient @Inject constructor() {
     private var modelName: String = DEFAULT_MODEL
     private var serviceBaseUrl: String = DEFAULT_BASE_URL
     @Volatile
+    private var defaultTemperature: Float = DEFAULT_TEMPERATURE
+    @Volatile
+    private var defaultMaxTokens: Int = DEFAULT_MAX_TOKENS
+    @Volatile
     private var apiService: VLMApiService = createService(DEFAULT_BASE_URL)
 
-    fun configure(apiKey: String, baseUrl: String? = null, modelName: String? = null) {
+    fun configure(
+        apiKey: String,
+        baseUrl: String? = null,
+        modelName: String? = null,
+        temperature: Float? = null,
+        maxTokens: Int? = null
+    ) {
         this.apiKey = apiKey.trim()
 
         var needsRebuild = false
@@ -70,6 +80,14 @@ class VLMClient @Inject constructor() {
             this.modelName = it.trim()
         }
 
+        temperature?.let { provided ->
+            defaultTemperature = provided
+        }
+
+        maxTokens?.let { provided ->
+            defaultMaxTokens = provided
+        }
+
         if (needsRebuild || serviceBaseUrl != this.baseUrl) {
             apiService = createService(this.baseUrl)
             serviceBaseUrl = this.baseUrl
@@ -82,14 +100,16 @@ class VLMClient @Inject constructor() {
         systemPrompt: String,
         userPrompt: String,
         imageDataUri: String,
-        temperature: Float = DEFAULT_TEMPERATURE,
-        maxTokens: Int = DEFAULT_MAX_TOKENS
+        temperature: Float? = null,
+        maxTokens: Int? = null
     ): Result<String> = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
             return@withContext Result.failure(IllegalStateException("尚未配置 API Key"))
         }
 
         return@withContext runCatching {
+            val resolvedTemperature = temperature ?: defaultTemperature
+            val resolvedMaxTokens = maxTokens ?: defaultMaxTokens
             val request = ChatRequest(
                 model = modelName,
                 messages = listOf(
@@ -105,11 +125,13 @@ class VLMClient @Inject constructor() {
                         )
                     )
                 ),
-                temperature = temperature,
-                maxTokens = maxTokens
+                temperature = resolvedTemperature,
+                maxTokens = resolvedMaxTokens
             )
 
-            Timber.d("发送多模态请求，model=$modelName temperature=$temperature")
+            Timber.d(
+                "发送多模态请求，model=$modelName temperature=$resolvedTemperature maxTokens=$resolvedMaxTokens"
+            )
             val response = apiService.chat(authorization = "Bearer $apiKey", request = request)
             if (response.choices.isEmpty()) {
                 error("API 响应为空")
@@ -121,25 +143,29 @@ class VLMClient @Inject constructor() {
     suspend fun chatText(
         systemPrompt: String,
         userPrompt: String,
-        temperature: Float = DEFAULT_TEMPERATURE,
-        maxTokens: Int = DEFAULT_MAX_TOKENS
+        temperature: Float? = null,
+        maxTokens: Int? = null
     ): Result<String> = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
             return@withContext Result.failure(IllegalStateException("尚未配置 API Key"))
         }
 
         return@withContext runCatching {
+            val resolvedTemperature = temperature ?: defaultTemperature
+            val resolvedMaxTokens = maxTokens ?: defaultMaxTokens
             val request = ChatRequest(
                 model = modelName,
                 messages = listOf(
                     Message(role = "system", content = systemPrompt),
                     Message(role = "user", content = userPrompt)
                 ),
-                temperature = temperature,
-                maxTokens = maxTokens
+                temperature = resolvedTemperature,
+                maxTokens = resolvedMaxTokens
             )
 
-            Timber.d("发送纯文本请求，model=$modelName temperature=$temperature")
+            Timber.d(
+                "发送纯文本请求，model=$modelName temperature=$resolvedTemperature maxTokens=$resolvedMaxTokens"
+            )
             val response = apiService.chat(authorization = "Bearer $apiKey", request = request)
             if (response.choices.isEmpty()) {
                 error("API 响应为空")

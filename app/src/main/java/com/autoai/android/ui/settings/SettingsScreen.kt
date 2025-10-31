@@ -15,7 +15,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -355,9 +358,14 @@ class SettingsViewModel @Inject constructor(
         private val API_KEY = stringPreferencesKey("api_key")
         private val BASE_URL = stringPreferencesKey("base_url")
         private val MODEL_NAME = stringPreferencesKey("model_name")
-        
+        private val TEMPERATURE = floatPreferencesKey("temperature")
+        private val MAX_TOKENS = intPreferencesKey("max_tokens")
+        private val DARK_THEME = booleanPreferencesKey("dark_theme")
+
         private const val DEFAULT_BASE_URL = "https://api.siliconflow.cn/"
         private const val DEFAULT_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
+        private const val DEFAULT_TEMPERATURE = 0.3f
+        private const val DEFAULT_MAX_TOKENS = 1000
     }
 
     private val _apiKey = MutableStateFlow("")
@@ -369,12 +377,12 @@ class SettingsViewModel @Inject constructor(
     private val _modelName = MutableStateFlow(DEFAULT_MODEL)
     val modelName: StateFlow<String> = _modelName
     
-    private val _temperature = MutableStateFlow(0.3f)
+    private val _temperature = MutableStateFlow(DEFAULT_TEMPERATURE)
     val temperature: StateFlow<Float> = _temperature
-    
-    private val _maxTokens = MutableStateFlow(1000)
+
+    private val _maxTokens = MutableStateFlow(DEFAULT_MAX_TOKENS)
     val maxTokens: StateFlow<Int> = _maxTokens
-    
+
     private val _isDarkTheme = MutableStateFlow(false)
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme
 
@@ -401,6 +409,19 @@ class SettingsViewModel @Inject constructor(
                     _apiKey.value = preferences[API_KEY] ?: ""
                     _baseUrl.value = preferences[BASE_URL] ?: DEFAULT_BASE_URL
                     _modelName.value = preferences[MODEL_NAME] ?: DEFAULT_MODEL
+                    _temperature.value = preferences[TEMPERATURE] ?: DEFAULT_TEMPERATURE
+                    _maxTokens.value = preferences[MAX_TOKENS] ?: DEFAULT_MAX_TOKENS
+                    _isDarkTheme.value = preferences[DARK_THEME] ?: false
+
+                    if (_apiKey.value.isNotBlank()) {
+                        vlmClient.configure(
+                            apiKey = _apiKey.value,
+                            baseUrl = _baseUrl.value,
+                            modelName = _modelName.value,
+                            temperature = _temperature.value,
+                            maxTokens = _maxTokens.value
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "加载设置失败: ${e.message}"
@@ -430,15 +451,17 @@ class SettingsViewModel @Inject constructor(
     }
     
     fun updateTemperature(value: Float) {
-        _temperature.value = value
+        _temperature.value = value.coerceIn(0f, 1f)
         _isSaved.value = false
+        _testResult.value = null
     }
-    
+
     fun updateMaxTokens(value: Int) {
-        _maxTokens.value = value
+        _maxTokens.value = value.coerceIn(100, 4000)
         _isSaved.value = false
+        _testResult.value = null
     }
-    
+
     fun updateDarkTheme(value: Boolean) {
         _isDarkTheme.value = value
         _isSaved.value = false
@@ -473,15 +496,20 @@ class SettingsViewModel @Inject constructor(
                     preferences[API_KEY] = _apiKey.value
                     preferences[BASE_URL] = _baseUrl.value
                     preferences[MODEL_NAME] = _modelName.value
+                    preferences[TEMPERATURE] = _temperature.value
+                    preferences[MAX_TOKENS] = _maxTokens.value
+                    preferences[DARK_THEME] = _isDarkTheme.value
                 }
-                
+
                 // 更新 VLMClient 配置
                 vlmClient.configure(
                     apiKey = _apiKey.value,
                     baseUrl = _baseUrl.value,
-                    modelName = _modelName.value
+                    modelName = _modelName.value,
+                    temperature = _temperature.value,
+                    maxTokens = _maxTokens.value
                 )
-                
+
                 _isSaved.value = true
                 _errorMessage.value = null
             } catch (e: Exception) {
@@ -517,7 +545,9 @@ class SettingsViewModel @Inject constructor(
                 vlmClient.configure(
                     apiKey = _apiKey.value,
                     baseUrl = _baseUrl.value,
-                    modelName = _modelName.value
+                    modelName = _modelName.value,
+                    temperature = _temperature.value,
+                    maxTokens = _maxTokens.value
                 )
 
                 val result = vlmClient.testConnection()
