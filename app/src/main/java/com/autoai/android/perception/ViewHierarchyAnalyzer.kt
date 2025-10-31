@@ -15,7 +15,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 使用 Shizuku + UIAutomator 抽取当前前台应用的控件树。
+ * 使用 Shizuku + UIAutomator 抽取当前前台应用的控件树
  */
 @Singleton
 class ViewHierarchyAnalyzer @Inject constructor(
@@ -103,29 +103,37 @@ class ViewHierarchyAnalyzer @Inject constructor(
 
     private fun ensureDumpDirectory() {
         val dir = File(DUMP_DIR)
-        if (!dir.exists() && !dir.mkdirs()) {
-            throw IllegalStateException("无法创建控件树导出目录: $DUMP_DIR")
+        if (dir.exists()) {
+            return
+        }
+
+        val result = ShizukuShell.executeCommand("mkdir", "-p", DUMP_DIR)
+        if (!result.isSuccess) {
+            val reason = result.errorMessage.ifBlank { result.output.ifBlank { "未知错误" } }
+            throw IllegalStateException("无法创建控件树导出目录: $reason")
         }
     }
 
     private fun dumpWindowHierarchy() {
-        Timber.d("执行uiautomator dump")
-        
+        Timber.d("执行 uiautomator dump")
+
         val result = ShizukuShell.executeCommandWithTimeout(15, "uiautomator", "dump", DUMP_FILE)
-        
         if (!result.isSuccess) {
             throw IllegalStateException("uiautomator dump 执行失败: ${result.errorMessage}")
         }
     }
 
     private fun readDumpFile(): String {
-        val file = File(DUMP_FILE)
-        if (!file.exists()) {
-            throw IllegalStateException("控件树文件不存在: $DUMP_FILE")
+        val readResult = ShizukuShell.executeCommandWithTimeout(10, "cat", DUMP_FILE)
+        if (!readResult.isSuccess || readResult.output.isBlank()) {
+            val message = readResult.errorMessage.ifBlank { "控件树文件读取为空" }
+            throw IllegalStateException("读取控件树文件失败: $message")
         }
-        return file.readText().also {
-            runCatching { file.delete() }
-        }
+
+        runCatching { ShizukuShell.executeCommand("rm", DUMP_FILE) }
+            .onFailure { Timber.w(it, "删除控件树临时文件失败: $DUMP_FILE") }
+
+        return readResult.output
     }
 
     private fun parseXml(xml: String): ViewNode {
