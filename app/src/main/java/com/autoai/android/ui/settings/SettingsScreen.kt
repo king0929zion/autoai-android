@@ -520,14 +520,15 @@ class SettingsViewModel @Inject constructor(
                     modelName = _modelName.value
                 )
 
-                vlmClient.testConnection()
-                    .onSuccess { result ->
-                        _testResult.value = result
-                    }
-                    .onFailure { throwable ->
-                        val reason = throwable.message?.takeIf { it.isNotBlank() } ?: "未知错误"
-                        _errorMessage.value = "连接测试失败: $reason"
-                    }
+                val result = vlmClient.testConnection()
+                result.onSuccess { connection ->
+                    _testResult.value = connection
+                }
+
+                result.onFailure { throwable ->
+                    val reason = throwable.message?.takeIf { it.isNotBlank() } ?: "未知错误"
+                    _errorMessage.value = "连接测试失败: $reason"
+                }
             } catch (e: Exception) {
                 val reason = e.message?.takeIf { it.isNotBlank() } ?: "未知错误"
                 _errorMessage.value = "连接测试失败: $reason"
