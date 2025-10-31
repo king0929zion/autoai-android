@@ -1,6 +1,7 @@
 ﻿package com.autoai.android.ui.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -23,8 +25,7 @@ import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.Button
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -58,7 +59,6 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -117,10 +117,11 @@ fun ChatScreen(
                 .padding(padding)
         ) {
             QuickActionRow(
+                actions = viewModel.quickActions,
+                onActionSelected = { viewModel.updateInputText(it) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                onActionSelected = { viewModel.updateInputText(it) }
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             )
 
             Divider(
@@ -143,97 +144,110 @@ fun ChatScreen(
                 }
             }
 
-            Surface(
-                tonalElevation = 4.dp,
-                shadowElevation = 4.dp
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    OutlinedTextField(
-                        value = inputText,
-                        onValueChange = viewModel::updateInputText,
-                        modifier = Modifier.weight(1f),
-                        placeholder = { Text("请输入要执行的任务") },
-                        enabled = !isProcessing,
-                        maxLines = 4,
-                        trailingIcon = {
-                            if (inputText.isNotBlank()) {
-                                IconButton(onClick = { viewModel.updateInputText("") }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "清空")
-                                }
-                            }
-                        }
-                    )
+            Divider(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+            )
 
-                    Spacer(modifier = Modifier.width(12.dp))
-
-                    val canSend = inputText.isNotBlank() && !isProcessing
-                    Surface(
-                        modifier = Modifier
-                            .size(52.dp)
-                            .clip(CircleShape),
-                        color = if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-                    ) {
-                        IconButton(
-                            enabled = canSend,
-                            onClick = { viewModel.sendMessage() },
-                            modifier = Modifier.fillMaxSize()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Send,
-                                contentDescription = "发送",
-                                tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun QuickActionRow(
-    modifier: Modifier = Modifier,
-    onActionSelected: (String) -> Unit
-) {
-    val actions = remember {
-        listOf(
-            QuickAction("打开微信", "打开微信"),
-            QuickAction("打开系统设置", "打开系统设置"),
-            QuickAction("截图并保存", "截图并保存"),
-            QuickAction("播放音乐", "播放音乐"),
-            QuickAction("在浏览器搜索", "在浏览器搜索")
-        )
-    }
-
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        actions.forEach { action ->
-            AssistChip(
-                onClick = { onActionSelected(action.command) },
-                label = { Text(action.label) },
-                colors = AssistChipDefaults.assistChipColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            ChatInputBar(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                text = inputText,
+                enabled = !isProcessing,
+                onTextChange = viewModel::updateInputText,
+                onSend = viewModel::sendMessage
             )
         }
     }
 }
 
 @Composable
+private fun QuickActionRow(
+    actions: List<QuickAction>,
+    onActionSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    if (actions.isEmpty()) return
+
+    LazyRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(actions) { action ->
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                tonalElevation = 2.dp
+            ) {
+                Text(
+                    text = action.label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(24.dp))
+                        .clickable { onActionSelected(action.command) }
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatInputBar(
+    modifier: Modifier = Modifier,
+    text: String,
+    enabled: Boolean,
+    onTextChange: (String) -> Unit,
+    onSend: () -> Unit
+) {
+    val canSend = enabled && text.isNotBlank()
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.Bottom
+    ) {
+        OutlinedTextField(
+            value = text,
+            onValueChange = onTextChange,
+            modifier = Modifier.weight(1f),
+            placeholder = { Text("请输入要执行的任务") },
+            enabled = enabled,
+            maxLines = 4,
+            trailingIcon = {
+                if (text.isNotBlank()) {
+                    IconButton(onClick = { onTextChange("") }) {
+                        Icon(Icons.Default.Clear, contentDescription = "清空")
+                    }
+                }
+            }
+        )
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Button(
+            onClick = onSend,
+            enabled = canSend,
+            shape = CircleShape,
+            modifier = Modifier.height(56.dp)
+        ) {
+            Icon(Icons.Default.Send, contentDescription = "发送")
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(text = if (enabled) "发送" else "执行中")
+        }
+    }
+}
+
+@Composable
 private fun MessageBubble(message: ChatMessage) {
-    val alignment = if (message.isUser) Alignment.End else Alignment.Start
+    val isUser = message.isUser
+    val alignment = if (isUser) Alignment.End else Alignment.Start
     val bubbleShape = RoundedCornerShape(
-        topStart = if (message.isUser) 16.dp else 4.dp,
-        topEnd = if (message.isUser) 4.dp else 16.dp,
+        topStart = if (isUser) 16.dp else 4.dp,
+        topEnd = if (isUser) 4.dp else 16.dp,
         bottomStart = 16.dp,
         bottomEnd = 16.dp
     )
@@ -242,36 +256,31 @@ private fun MessageBubble(message: ChatMessage) {
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = alignment
     ) {
-        val brush = if (message.isUser) {
-            Brush.verticalGradient(
-                colors = listOf(
-                    MaterialTheme.colorScheme.primary,
-                    MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-                )
-            )
-        } else null
-
         Surface(
             shape = bubbleShape,
-            color = if (brush == null) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-            shadowElevation = if (message.isUser) 4.dp else 0.dp,
-            tonalElevation = if (message.isUser) 4.dp else 0.dp
+            color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+            tonalElevation = if (isUser) 4.dp else 0.dp
         ) {
             Box(
                 modifier = Modifier
-                    .background(brush ?: Color.Transparent, bubbleShape)
+                    .background(
+                        if (isUser) Brush.verticalGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                            )
+                        ) else Color.Transparent,
+                        bubbleShape
+                    )
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         text = message.content,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (message.isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+                        color = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                     )
-                    message.task?.let { task ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        TaskStatusCard(task)
-                    }
+                    message.task?.let { TaskStatusCard(it) }
                 }
             }
         }
@@ -289,13 +298,14 @@ private fun MessageBubble(message: ChatMessage) {
 private fun TaskStatusCard(task: Task) {
     Surface(
         shape = RoundedCornerShape(12.dp),
-        tonalElevation = 2.dp
+        tonalElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(12.dp)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             val statusText = when (task.status) {
                 TaskStatus.PENDING -> "已接收任务"
@@ -334,7 +344,7 @@ private fun TaskStatusCard(task: Task) {
 
 private fun formatTimestamp(timestamp: Long): String {
     val formatter = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
-    return formatter.format(java.util.Date(timestamp))
+    return formatter.format(timestamp)
 }
 
 data class QuickAction(
@@ -355,11 +365,19 @@ class ChatViewModel @Inject constructor(
     private val taskManager: TaskManager
 ) : ViewModel() {
 
+    val quickActions = listOf(
+        QuickAction("打开微信", "打开微信"),
+        QuickAction("打开系统设置", "打开系统设置"),
+        QuickAction("截图并保存", "截图并保存"),
+        QuickAction("播放音乐", "播放音乐"),
+        QuickAction("在浏览器搜索", "在浏览器搜索")
+    )
+
     private val _messages = MutableStateFlow<List<ChatMessage>>(
         listOf(
             ChatMessage(
                 id = "welcome",
-                content = "你好！我是 AI 自动控机助手。\n\n可以告诉我要完成的任务，例如：\n• 打开微信\n• 在浏览器搜索内容\n• 截图并保存\n\n提示：复杂任务建议拆分为多个步骤。",
+                content = "你好！我是 AI 自动控机助手。\n\n可以告诉我需要完成的任务，例如：\n• 打开微信\n• 在浏览器搜索内容\n• 截图并保存\n\n提示：复杂任务建议拆分为多个步骤。",
                 isUser = false
             )
         )
@@ -425,7 +443,7 @@ class ChatViewModel @Inject constructor(
             } catch (error: Throwable) {
                 Timber.e(error, "execute task failed")
                 _messages.update { list ->
-                    val cleaned = list.dropLastWhile { it.content.contains("执行，请稍候") }
+                    val cleaned = list.dropLastWhile { it.content.contains("正在执行") }
                     cleaned + ChatMessage(
                         id = "${System.currentTimeMillis()}_exception",
                         content = "⚠️ 发生异常\n\n${error.message ?: "请查看日志"}",
@@ -448,5 +466,3 @@ class ChatViewModel @Inject constructor(
         )
     }
 }
-
-
