@@ -11,6 +11,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -19,6 +20,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.autoai.android.decision.TestConnectionResult
 import com.autoai.android.decision.VLMClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +44,8 @@ fun SettingsScreen(
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val isSaved by viewModel.isSaved.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val isTesting by viewModel.isTestingConnection.collectAsState()
+    val testResult by viewModel.testResult.collectAsState()
 
     Scaffold(
         topBar = {
@@ -181,12 +185,37 @@ fun SettingsScreen(
                 }
             }
 
-            // 保存按钮
-            Button(
-                onClick = { viewModel.saveSettings() },
-                modifier = Modifier.fillMaxWidth()
+            // 操作按钮
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("保存设置")
+                Button(
+                    onClick = { viewModel.saveSettings() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("保存设置")
+                }
+
+                OutlinedButton(
+                    onClick = { viewModel.testConnection() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isTesting
+                ) {
+                    if (isTesting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("正在测试…")
+                    } else {
+                        Text("测试 API 连接")
+                    }
+                }
+            }
+
+            testResult?.let { status ->
+                ApiTestResultCard(status)
             }
 
             // 错误提示
@@ -351,9 +380,15 @@ class SettingsViewModel @Inject constructor(
 
     private val _isSaved = MutableStateFlow(false)
     val isSaved: StateFlow<Boolean> = _isSaved
-    
+
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
+
+    private val _isTestingConnection = MutableStateFlow(false)
+    val isTestingConnection: StateFlow<Boolean> = _isTestingConnection
+
+    private val _testResult = MutableStateFlow<TestConnectionResult?>(null)
+    val testResult: StateFlow<TestConnectionResult?> = _testResult
 
     init {
         loadSettings()
@@ -377,18 +412,21 @@ class SettingsViewModel @Inject constructor(
         _apiKey.value = value
         _isSaved.value = false
         _errorMessage.value = null
+        _testResult.value = null
     }
 
     fun updateBaseUrl(value: String) {
         _baseUrl.value = value
         _isSaved.value = false
         _errorMessage.value = null
+        _testResult.value = null
     }
 
     fun updateModelName(value: String) {
         _modelName.value = value
         _isSaved.value = false
         _errorMessage.value = null
+        _testResult.value = null
     }
     
     fun updateTemperature(value: Float) {
@@ -451,8 +489,112 @@ class SettingsViewModel @Inject constructor(
             }
         }
     }
-    
+
+    fun testConnection() {
+        if (_isTestingConnection.value) return
+
+        viewModelScope.launch {
+            try {
+                if (_apiKey.value.isBlank()) {
+                    _errorMessage.value = "请先填写 API Key"
+                    return@launch
+                }
+
+                if (_baseUrl.value.isBlank()) {
+                    _errorMessage.value = "请先填写 Base URL"
+                    return@launch
+                }
+
+                if (_modelName.value.isBlank()) {
+                    _errorMessage.value = "请先填写模型名称"
+                    return@launch
+                }
+
+                _isTestingConnection.value = true
+                _errorMessage.value = null
+                _testResult.value = null
+
+                vlmClient.configure(
+                    apiKey = _apiKey.value,
+                    baseUrl = _baseUrl.value,
+                    modelName = _modelName.value
+                )
+
+                vlmClient.testConnection()
+                    .onSuccess { result ->
+                        _testResult.value = result
+                    }
+                    .onFailure { throwable ->
+                        val reason = throwable.message?.takeIf { it.isNotBlank() } ?: "未知错误"
+                        _errorMessage.value = "连接测试失败: $reason"
+                    }
+            } catch (e: Exception) {
+                val reason = e.message?.takeIf { it.isNotBlank() } ?: "未知错误"
+                _errorMessage.value = "连接测试失败: $reason"
+            } finally {
+                _isTestingConnection.value = false
+            }
+        }
+    }
+
     fun clearError() {
         _errorMessage.value = null
     }
 }
+
+@Composable
+private fun ApiTestResultCard(result: TestConnectionResult) {
+    val (icon, message, containerColor, contentColor) = if (result.targetModelAvailable) {
+        TestResultVisuals(
+            icon = "✅",
+            message = "API 连接正常，检测到 ${result.availableModelCount} 个模型",
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    } else {
+        TestResultVisuals(
+            icon = "⚠️",
+            message = "API 可访问，但未找到配置的模型",
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+        )
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = containerColor)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            Text(
+                text = icon,
+                style = MaterialTheme.typography.headlineSmall,
+                color = contentColor
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = contentColor
+                )
+                Text(
+                    text = "当前模型: ${if (result.targetModelAvailable) "可用" else "未找到"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = contentColor.copy(alpha = 0.85f)
+                )
+            }
+        }
+    }
+}
+
+private data class TestResultVisuals(
+    val icon: String,
+    val message: String,
+    val containerColor: Color,
+    val contentColor: Color
+)

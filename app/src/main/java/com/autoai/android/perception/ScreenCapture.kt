@@ -41,34 +41,29 @@ class ScreenCapture @Inject constructor(
 
             Timber.d("开始捕获屏幕...")
             
-            // 使用临时文件保存截图
-            val tempFile = "/sdcard/autoai_screenshot.png"
-            
-            // 执行截图命令
-            val result = ShizukuShell.executeCommandWithTimeout(10, "screencap", "-p", tempFile)
-            
+            val result = ShizukuShell.executeCommandForBinaryWithTimeout(
+                15,
+                "sh",
+                "-c",
+                "screencap -p"
+            )
+
             if (!result.isSuccess) {
                 Timber.e("截图命令失败: ${result.errorMessage}")
                 return@withContext Result.failure(Exception("截图失败: ${result.errorMessage}"))
             }
-            
-            // 读取截图文件
-            val readResult = ShizukuShell.executeCommand("cat", tempFile)
-            
-            if (!readResult.isSuccess) {
-                Timber.e("读取截图文件失败: ${readResult.errorMessage}")
-                return@withContext Result.failure(Exception("读取截图失败: ${readResult.errorMessage}"))
+
+            if (result.output.isEmpty()) {
+                Timber.e("截图失败: 输出为空")
+                return@withContext Result.failure(Exception("无法获取截图数据"))
             }
-            
-            // 删除临时文件
-            ShizukuShell.executeCommand("rm", tempFile)
-            
+
             // 将输出转换为Bitmap
             val bitmap = try {
                 BitmapFactory.decodeByteArray(
-                    readResult.output.toByteArray(Charsets.ISO_8859_1),
+                    result.output,
                     0,
-                    readResult.output.length
+                    result.output.size
                 )
             } catch (e: Exception) {
                 Timber.e(e, "解码截图数据失败")
