@@ -9,6 +9,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import timber.log.Timber
@@ -156,6 +157,23 @@ class VLMClient @Inject constructor() {
         return retrofit.create(VLMApiService::class.java)
     }
 
+    suspend fun testConnection(): Result<TestConnectionResult> = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("尚未配置 API Key"))
+        }
+
+        runCatching {
+            Timber.d("测试 API 连接: baseUrl=$baseUrl")
+            val response = apiService.listModels(authorization = "Bearer $apiKey")
+            val models = response.data.map { it.id }
+            TestConnectionResult(
+                isReachable = true,
+                targetModelAvailable = models.any { it == modelName },
+                availableModelCount = models.size
+            )
+        }.onFailure { Timber.e(it, "API 连接测试失败") }
+    }
+
     private fun normalizeBaseUrl(url: String): String {
         val trimmed = url.trim()
         return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
@@ -168,6 +186,11 @@ private interface VLMApiService {
         @Header("Authorization") authorization: String,
         @Body request: ChatRequest
     ): ChatResponse
+
+    @GET("v1/models")
+    suspend fun listModels(
+        @Header("Authorization") authorization: String
+    ): ModelsResponse
 }
 
 private data class ChatRequest(
@@ -198,6 +221,20 @@ private sealed class MessageContent {
         val imageUrl: ImageUrl
     ) : MessageContent()
 }
+
+data class TestConnectionResult(
+    val isReachable: Boolean,
+    val targetModelAvailable: Boolean,
+    val availableModelCount: Int
+)
+
+private data class ModelsResponse(
+    val data: List<ModelInfo> = emptyList()
+)
+
+private data class ModelInfo(
+    val id: String
+)
 
 private data class ImageUrl(
     val url: String
