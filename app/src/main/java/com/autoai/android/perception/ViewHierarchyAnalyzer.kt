@@ -3,11 +3,11 @@ package com.autoai.android.perception
 import android.graphics.Rect
 import com.autoai.android.data.model.ScreenState.ViewNode
 import com.autoai.android.permission.ShizukuManager
+import com.autoai.android.utils.ShizukuShell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
-import rikka.shizuku.Shizuku
 import timber.log.Timber
 import java.io.File
 import java.io.StringReader
@@ -110,25 +110,11 @@ class ViewHierarchyAnalyzer @Inject constructor(
 
     private fun dumpWindowHierarchy() {
         Timber.d("执行uiautomator dump")
-        val process = try {
-            Shizuku.newProcess(arrayOf("uiautomator", "dump", DUMP_FILE), null, null)
-        } catch (e: Exception) {
-            Timber.e(e, "无法创建Shizuku进程")
-            throw IllegalStateException("创建uiautomator进程失败: ${e.message}", e)
-        }
         
-        // 增加超时检查
-        val hasFinished = process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)
-        if (!hasFinished) {
-            process.destroy()
-            throw IllegalStateException("uiautomator dump 执行超时")
-        }
+        val result = ShizukuShell.executeCommandWithTimeout(15, "uiautomator", "dump", DUMP_FILE)
         
-        val exitCode = process.exitValue()
-        if (exitCode != 0) {
-            // 读取错误信息
-            val errorText = process.errorStream.bufferedReader().use { it.readText() }
-            throw IllegalStateException("uiautomator dump 执行失败，退出码: $exitCode, 错误: $errorText")
+        if (!result.isSuccess) {
+            throw IllegalStateException("uiautomator dump 执行失败: ${result.errorMessage}")
         }
     }
 

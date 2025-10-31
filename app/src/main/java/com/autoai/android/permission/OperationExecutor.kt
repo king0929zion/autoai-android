@@ -3,13 +3,10 @@ package com.autoai.android.permission
 import android.view.KeyEvent
 import com.autoai.android.data.model.Action
 import com.autoai.android.data.model.ActionResult
-import kotlinx.coroutines.Dispatchers
+import com.autoai.android.utils.ShizukuShell
+import com.autoai.android.utils.ShellResult
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import rikka.shizuku.Shizuku
 import timber.log.Timber
-import java.io.BufferedReader
-import java.io.InputStreamReader
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -155,28 +152,8 @@ class OperationExecutor @Inject constructor(
         return ActionResult.success("等待完成")
     }
 
-    private fun executeShellCommand(command: String): ShellResult = runCatching {
-        val process = try {
-            Shizuku.newProcess(arrayOf("sh", "-c", command), null, null)
-        } catch (e: Exception) {
-            Timber.e(e, "无法创建Shizuku进程")
-            return@runCatching ShellResult(false, "", "创建进程失败: ${e.message}")
-        }
-        
-        val stdout = BufferedReader(InputStreamReader(process.inputStream)).use { it.readText() }
-        val stderr = BufferedReader(InputStreamReader(process.errorStream)).use { it.readText() }
-        val exitCode = process.waitFor()
-        process.destroy()
-
-        if (exitCode == 0) {
-            ShellResult(true, stdout, "")
-        } else {
-            Timber.w("命令失败: %s, code=%d, error=%s", command, exitCode, stderr)
-            ShellResult(false, stdout, stderr.ifBlank { "命令执行失败 (code=$exitCode)" })
-        }
-    }.getOrElse { error ->
-        Timber.e(error, "执行命令异常: %s", command)
-        ShellResult(false, "", error.message ?: "未知错误")
+    private fun executeShellCommand(command: String): ShellResult {
+        return ShizukuShell.executeCommand("sh", "-c", command)
     }
 
     private fun parsePackageName(output: String): String {
@@ -192,9 +169,3 @@ class OperationExecutor @Inject constructor(
         private const val DELAY_AFTER_LAUNCH_APP = 2_000L
     }
 }
-
-private data class ShellResult(
-    val isSuccess: Boolean,
-    val output: String,
-    val errorMessage: String
-)

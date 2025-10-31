@@ -4,9 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
 import com.autoai.android.permission.ShizukuManager
+import com.autoai.android.utils.ShizukuShell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import rikka.shizuku.Shizuku
 import timber.log.Timber
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -41,39 +41,45 @@ class ScreenCapture @Inject constructor(
 
             Timber.d("开始捕获屏幕...")
             
-            // 使用 Shizuku 执行 screencap 命令
-            val process = try {
-                Shizuku.newProcess(arrayOf("screencap", "-p"), null, null)
+            // 使用临时文件保存截图
+            val tempFile = "/sdcard/autoai_screenshot.png"
+            
+            // 执行截图命令
+            val result = ShizukuShell.executeCommandWithTimeout(10, "screencap", "-p", tempFile)
+            
+            if (!result.isSuccess) {
+                Timber.e("截图命令失败: ${result.errorMessage}")
+                return@withContext Result.failure(Exception("截图失败: ${result.errorMessage}"))
+            }
+            
+            // 读取截图文件
+            val readResult = ShizukuShell.executeCommand("cat", tempFile)
+            
+            if (!readResult.isSuccess) {
+                Timber.e("读取截图文件失败: ${readResult.errorMessage}")
+                return@withContext Result.failure(Exception("读取截图失败: ${readResult.errorMessage}"))
+            }
+            
+            // 删除临时文件
+            ShizukuShell.executeCommand("rm", tempFile)
+            
+            // 将输出转换为Bitmap
+            val bitmap = try {
+                BitmapFactory.decodeByteArray(
+                    readResult.output.toByteArray(Charsets.ISO_8859_1),
+                    0,
+                    readResult.output.length
+                )
             } catch (e: Exception) {
-                Timber.e(e, "无法创建Shizuku进程")
-                return@withContext Result.failure(Exception("创建截图进程失败: ${e.message}"))
-            }
-            
-            // 增加超时检查
-            val hasFinished = process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
-            if (!hasFinished) {
-                process.destroy()
-                return@withContext Result.failure(Exception("截图超时"))
-            }
-            
-            // 检查退出码
-            val exitCode = process.exitValue()
-            if (exitCode != 0) {
-                val error = process.errorStream.bufferedReader().use { it.readText() }
-                Timber.e("截图命令失败: exitCode=$exitCode, error=$error")
-                return@withContext Result.failure(Exception("截图失败: $error"))
-            }
-            
-            // 读取输出流为 Bitmap
-            val bitmap = process.inputStream.use { inputStream ->
-                BitmapFactory.decodeStream(inputStream)
+                Timber.e(e, "解码截图数据失败")
+                null
             }
             
             if (bitmap != null) {
                 Timber.d("截图成功: ${bitmap.width}x${bitmap.height}")
                 Result.success(bitmap)
             } else {
-                Timber.e("截图失败: Bitmap 为 null")
+                Timber.e("截图失败: 无法解码Bitmap")
                 Result.failure(Exception("无法解码截图数据"))
             }
         } catch (e: Exception) {
