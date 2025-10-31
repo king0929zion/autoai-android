@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.animateItemPlacement
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -59,7 +58,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -180,9 +178,7 @@ fun ChatScreen(
                     items(items = messages, key = { it.id }) { message ->
                         MessageBubble(
                             message = message,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .animateItemPlacement()
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -291,7 +287,6 @@ private fun MessageBubble(
             color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
             modifier = Modifier.animateContentSize()
         ) {
-            val textColor = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
             val contentModifier = if (isUser) {
                 Modifier
                     .background(
@@ -315,7 +310,7 @@ private fun MessageBubble(
                 Text(
                     text = message.content,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = textColor
+                    color = if (isUser) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                 )
                 message.task?.let {
                     TaskSnapshot(task = it)
@@ -351,7 +346,7 @@ private fun TaskStatusBanner(
     val description = when {
         isProcessing -> "正在分析屏幕并规划下一步操作，请稍候。"
         task == null -> "随时告诉我新的指令，我会立即开始执行。"
-        task.status == TaskStatus.RUNNING -> "当前步骤：${task.currentStep}，最新动作会实时展示在对话中。"
+        task.status == TaskStatus.RUNNING -> "当前步骤：${task.currentStep}，最新动作将实时展示在对话中。"
         task.status == TaskStatus.COMPLETED -> task.result ?: "任务已成功结束。"
         task.status == TaskStatus.FAILED -> task.error ?: "请检查日志或稍后再试。"
         task.status == TaskStatus.PAUSED -> "任务已暂停，可在历史记录中继续。"
@@ -376,7 +371,7 @@ private fun TaskStatusBanner(
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-            if (!description.isNullOrBlank()) {
+            if (description.isNotBlank()) {
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
@@ -462,14 +457,14 @@ private fun TaskStatus.toReadableText(): String = when (this) {
 
 private fun Action.describe(): String = when (this) {
     is Action.Click -> {
-        val target = if (elementDescription.isNotBlank()) " [${elementDescription}]" else ""
-        "点击(${x}, ${y})${target}"
+        val target = if (elementDescription.isNotBlank()) " [$elementDescription]" else ""
+        "点击(${x}, ${y})$target"
     }
     is Action.LongClick -> "长按(${x}, ${y}) ${durationMs}ms"
     is Action.Swipe -> "滑动(${fromX}, ${fromY}) -> (${toX}, ${toY})"
     is Action.Input -> {
         val preview = text.take(20) + if (text.length > 20) "…" else ""
-        "输入 \"${preview}\""
+        "输入 \"$preview\""
     }
     is Action.PressKey -> "模拟按键：${keyCode}"
     is Action.OpenApp -> "打开应用：${packageName}"
@@ -494,7 +489,16 @@ class ChatViewModel @Inject constructor(
         listOf(
             ChatMessage(
                 id = "welcome",
-                content = "你好，我是 AutoAI 的执行助手。\n\n告诉我需要完成的任务，例如：\n• 打开微信并发送消息\n• 在浏览器中搜索资料\n• 截取屏幕并保存\n\n提示：复杂目标可以拆成多个步骤，我会依次执行。",
+                content = """
+                    你好，我是 AutoAI 的执行助手。
+
+                    你可以告诉我需要完成的任务，例如：
+                    • 打开微信并发送消息
+                    • 在浏览器中搜索资料
+                    • 截取当前屏幕并保存
+
+                    提示：复杂目标可以拆成多个步骤，我会依次完成。
+                """.trimIndent(),
                 isUser = false
             )
         )
@@ -596,4 +600,3 @@ data class ChatMessage(
     val timestamp: Long = System.currentTimeMillis(),
     val task: Task? = null
 )
-
