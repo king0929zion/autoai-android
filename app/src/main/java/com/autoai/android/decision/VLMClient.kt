@@ -9,6 +9,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
 import timber.log.Timber
@@ -51,9 +52,19 @@ class VLMClient @Inject constructor() {
     private var modelName: String = DEFAULT_MODEL
     private var serviceBaseUrl: String = DEFAULT_BASE_URL
     @Volatile
+    private var defaultTemperature: Float = DEFAULT_TEMPERATURE
+    @Volatile
+    private var defaultMaxTokens: Int = DEFAULT_MAX_TOKENS
+    @Volatile
     private var apiService: VLMApiService = createService(DEFAULT_BASE_URL)
 
-    fun configure(apiKey: String, baseUrl: String? = null, modelName: String? = null) {
+    fun configure(
+        apiKey: String,
+        baseUrl: String? = null,
+        modelName: String? = null,
+        temperature: Float? = null,
+        maxTokens: Int? = null
+    ) {
         this.apiKey = apiKey.trim()
 
         var needsRebuild = false
@@ -69,6 +80,14 @@ class VLMClient @Inject constructor() {
             this.modelName = it.trim()
         }
 
+        temperature?.let { provided ->
+            defaultTemperature = provided
+        }
+
+        maxTokens?.let { provided ->
+            defaultMaxTokens = provided
+        }
+
         if (needsRebuild || serviceBaseUrl != this.baseUrl) {
             apiService = createService(this.baseUrl)
             serviceBaseUrl = this.baseUrl
@@ -81,14 +100,16 @@ class VLMClient @Inject constructor() {
         systemPrompt: String,
         userPrompt: String,
         imageDataUri: String,
-        temperature: Float = DEFAULT_TEMPERATURE,
-        maxTokens: Int = DEFAULT_MAX_TOKENS
+        temperature: Float? = null,
+        maxTokens: Int? = null
     ): Result<String> = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
             return@withContext Result.failure(IllegalStateException("尚未配置 API Key"))
         }
 
         return@withContext runCatching {
+            val resolvedTemperature = temperature ?: defaultTemperature
+            val resolvedMaxTokens = maxTokens ?: defaultMaxTokens
             val request = ChatRequest(
                 model = modelName,
                 messages = listOf(
@@ -104,11 +125,13 @@ class VLMClient @Inject constructor() {
                         )
                     )
                 ),
-                temperature = temperature,
-                maxTokens = maxTokens
+                temperature = resolvedTemperature,
+                maxTokens = resolvedMaxTokens
             )
 
-            Timber.d("发送多模态请求，model=$modelName temperature=$temperature")
+            Timber.d(
+                "发送多模态请求，model=$modelName temperature=$resolvedTemperature maxTokens=$resolvedMaxTokens"
+            )
             val response = apiService.chat(authorization = "Bearer $apiKey", request = request)
             if (response.choices.isEmpty()) {
                 error("API 响应为空")
@@ -120,25 +143,29 @@ class VLMClient @Inject constructor() {
     suspend fun chatText(
         systemPrompt: String,
         userPrompt: String,
-        temperature: Float = DEFAULT_TEMPERATURE,
-        maxTokens: Int = DEFAULT_MAX_TOKENS
+        temperature: Float? = null,
+        maxTokens: Int? = null
     ): Result<String> = withContext(Dispatchers.IO) {
         if (apiKey.isBlank()) {
             return@withContext Result.failure(IllegalStateException("尚未配置 API Key"))
         }
 
         return@withContext runCatching {
+            val resolvedTemperature = temperature ?: defaultTemperature
+            val resolvedMaxTokens = maxTokens ?: defaultMaxTokens
             val request = ChatRequest(
                 model = modelName,
                 messages = listOf(
                     Message(role = "system", content = systemPrompt),
                     Message(role = "user", content = userPrompt)
                 ),
-                temperature = temperature,
-                maxTokens = maxTokens
+                temperature = resolvedTemperature,
+                maxTokens = resolvedMaxTokens
             )
 
-            Timber.d("发送纯文本请求，model=$modelName temperature=$temperature")
+            Timber.d(
+                "发送纯文本请求，model=$modelName temperature=$resolvedTemperature maxTokens=$resolvedMaxTokens"
+            )
             val response = apiService.chat(authorization = "Bearer $apiKey", request = request)
             if (response.choices.isEmpty()) {
                 error("API 响应为空")
@@ -156,6 +183,23 @@ class VLMClient @Inject constructor() {
         return retrofit.create(VLMApiService::class.java)
     }
 
+    suspend fun testConnection(): Result<TestConnectionResult> = withContext(Dispatchers.IO) {
+        if (apiKey.isBlank()) {
+            return@withContext Result.failure(IllegalStateException("尚未配置 API Key"))
+        }
+
+        runCatching {
+            Timber.d("测试 API 连接: baseUrl=$baseUrl")
+            val response = apiService.listModels(authorization = "Bearer $apiKey")
+            val models = response.data.map { it.id }
+            TestConnectionResult(
+                isReachable = true,
+                targetModelAvailable = models.any { it == modelName },
+                availableModelCount = models.size
+            )
+        }.onFailure { Timber.e(it, "API 连接测试失败") }
+    }
+
     private fun normalizeBaseUrl(url: String): String {
         val trimmed = url.trim()
         return if (trimmed.endsWith("/")) trimmed else "$trimmed/"
@@ -168,6 +212,11 @@ private interface VLMApiService {
         @Header("Authorization") authorization: String,
         @Body request: ChatRequest
     ): ChatResponse
+
+    @GET("v1/models")
+    suspend fun listModels(
+        @Header("Authorization") authorization: String
+    ): ModelsResponse
 }
 
 private data class ChatRequest(
@@ -198,6 +247,20 @@ private sealed class MessageContent {
         val imageUrl: ImageUrl
     ) : MessageContent()
 }
+
+data class TestConnectionResult(
+    val isReachable: Boolean,
+    val targetModelAvailable: Boolean,
+    val availableModelCount: Int
+)
+
+private data class ModelsResponse(
+    val data: List<ModelInfo> = emptyList()
+)
+
+private data class ModelInfo(
+    val id: String
+)
 
 private data class ImageUrl(
     val url: String

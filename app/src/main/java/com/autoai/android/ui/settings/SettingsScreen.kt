@@ -11,14 +11,19 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.autoai.android.decision.TestConnectionResult
 import com.autoai.android.decision.VLMClient
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +47,8 @@ fun SettingsScreen(
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val isSaved by viewModel.isSaved.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val isTesting by viewModel.isTestingConnection.collectAsState()
+    val testResult by viewModel.testResult.collectAsState()
 
     Scaffold(
         topBar = {
@@ -181,12 +188,37 @@ fun SettingsScreen(
                 }
             }
 
-            // 保存按钮
-            Button(
-                onClick = { viewModel.saveSettings() },
-                modifier = Modifier.fillMaxWidth()
+            // 操作按钮
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("保存设置")
+                Button(
+                    onClick = { viewModel.saveSettings() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("保存设置")
+                }
+
+                OutlinedButton(
+                    onClick = { viewModel.testConnection() },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !isTesting
+                ) {
+                    if (isTesting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("正在测试…")
+                    } else {
+                        Text("测试 API 连接")
+                    }
+                }
+            }
+
+            testResult?.let { status ->
+                ApiTestResultCard(status)
             }
 
             // 错误提示
@@ -326,9 +358,14 @@ class SettingsViewModel @Inject constructor(
         private val API_KEY = stringPreferencesKey("api_key")
         private val BASE_URL = stringPreferencesKey("base_url")
         private val MODEL_NAME = stringPreferencesKey("model_name")
-        
+        private val TEMPERATURE = floatPreferencesKey("temperature")
+        private val MAX_TOKENS = intPreferencesKey("max_tokens")
+        private val DARK_THEME = booleanPreferencesKey("dark_theme")
+
         private const val DEFAULT_BASE_URL = "https://api.siliconflow.cn/"
         private const val DEFAULT_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
+        private const val DEFAULT_TEMPERATURE = 0.3f
+        private const val DEFAULT_MAX_TOKENS = 1000
     }
 
     private val _apiKey = MutableStateFlow("")
@@ -340,20 +377,26 @@ class SettingsViewModel @Inject constructor(
     private val _modelName = MutableStateFlow(DEFAULT_MODEL)
     val modelName: StateFlow<String> = _modelName
     
-    private val _temperature = MutableStateFlow(0.3f)
+    private val _temperature = MutableStateFlow(DEFAULT_TEMPERATURE)
     val temperature: StateFlow<Float> = _temperature
-    
-    private val _maxTokens = MutableStateFlow(1000)
+
+    private val _maxTokens = MutableStateFlow(DEFAULT_MAX_TOKENS)
     val maxTokens: StateFlow<Int> = _maxTokens
-    
+
     private val _isDarkTheme = MutableStateFlow(false)
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme
 
     private val _isSaved = MutableStateFlow(false)
     val isSaved: StateFlow<Boolean> = _isSaved
-    
+
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
+
+    private val _isTestingConnection = MutableStateFlow(false)
+    val isTestingConnection: StateFlow<Boolean> = _isTestingConnection
+
+    private val _testResult = MutableStateFlow<TestConnectionResult?>(null)
+    val testResult: StateFlow<TestConnectionResult?> = _testResult
 
     init {
         loadSettings()
@@ -366,6 +409,19 @@ class SettingsViewModel @Inject constructor(
                     _apiKey.value = preferences[API_KEY] ?: ""
                     _baseUrl.value = preferences[BASE_URL] ?: DEFAULT_BASE_URL
                     _modelName.value = preferences[MODEL_NAME] ?: DEFAULT_MODEL
+                    _temperature.value = preferences[TEMPERATURE] ?: DEFAULT_TEMPERATURE
+                    _maxTokens.value = preferences[MAX_TOKENS] ?: DEFAULT_MAX_TOKENS
+                    _isDarkTheme.value = preferences[DARK_THEME] ?: false
+
+                    if (_apiKey.value.isNotBlank()) {
+                        vlmClient.configure(
+                            apiKey = _apiKey.value,
+                            baseUrl = _baseUrl.value,
+                            modelName = _modelName.value,
+                            temperature = _temperature.value,
+                            maxTokens = _maxTokens.value
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 _errorMessage.value = "加载设置失败: ${e.message}"
@@ -377,30 +433,35 @@ class SettingsViewModel @Inject constructor(
         _apiKey.value = value
         _isSaved.value = false
         _errorMessage.value = null
+        _testResult.value = null
     }
 
     fun updateBaseUrl(value: String) {
         _baseUrl.value = value
         _isSaved.value = false
         _errorMessage.value = null
+        _testResult.value = null
     }
 
     fun updateModelName(value: String) {
         _modelName.value = value
         _isSaved.value = false
         _errorMessage.value = null
+        _testResult.value = null
     }
     
     fun updateTemperature(value: Float) {
-        _temperature.value = value
+        _temperature.value = value.coerceIn(0f, 1f)
         _isSaved.value = false
+        _testResult.value = null
     }
-    
+
     fun updateMaxTokens(value: Int) {
-        _maxTokens.value = value
+        _maxTokens.value = value.coerceIn(100, 4000)
         _isSaved.value = false
+        _testResult.value = null
     }
-    
+
     fun updateDarkTheme(value: Boolean) {
         _isDarkTheme.value = value
         _isSaved.value = false
@@ -435,15 +496,20 @@ class SettingsViewModel @Inject constructor(
                     preferences[API_KEY] = _apiKey.value
                     preferences[BASE_URL] = _baseUrl.value
                     preferences[MODEL_NAME] = _modelName.value
+                    preferences[TEMPERATURE] = _temperature.value
+                    preferences[MAX_TOKENS] = _maxTokens.value
+                    preferences[DARK_THEME] = _isDarkTheme.value
                 }
-                
+
                 // 更新 VLMClient 配置
                 vlmClient.configure(
                     apiKey = _apiKey.value,
                     baseUrl = _baseUrl.value,
-                    modelName = _modelName.value
+                    modelName = _modelName.value,
+                    temperature = _temperature.value,
+                    maxTokens = _maxTokens.value
                 )
-                
+
                 _isSaved.value = true
                 _errorMessage.value = null
             } catch (e: Exception) {
@@ -451,8 +517,115 @@ class SettingsViewModel @Inject constructor(
             }
         }
     }
-    
+
+    fun testConnection() {
+        if (_isTestingConnection.value) return
+
+        viewModelScope.launch {
+            try {
+                if (_apiKey.value.isBlank()) {
+                    _errorMessage.value = "请先填写 API Key"
+                    return@launch
+                }
+
+                if (_baseUrl.value.isBlank()) {
+                    _errorMessage.value = "请先填写 Base URL"
+                    return@launch
+                }
+
+                if (_modelName.value.isBlank()) {
+                    _errorMessage.value = "请先填写模型名称"
+                    return@launch
+                }
+
+                _isTestingConnection.value = true
+                _errorMessage.value = null
+                _testResult.value = null
+
+                vlmClient.configure(
+                    apiKey = _apiKey.value,
+                    baseUrl = _baseUrl.value,
+                    modelName = _modelName.value,
+                    temperature = _temperature.value,
+                    maxTokens = _maxTokens.value
+                )
+
+                val result = vlmClient.testConnection()
+                result.onSuccess { connection ->
+                    _testResult.value = connection
+                }
+
+                result.onFailure { throwable ->
+                    val reason = throwable.message?.takeIf { it.isNotBlank() } ?: "未知错误"
+                    _errorMessage.value = "连接测试失败: $reason"
+                }
+            } catch (e: Exception) {
+                val reason = e.message?.takeIf { it.isNotBlank() } ?: "未知错误"
+                _errorMessage.value = "连接测试失败: $reason"
+            } finally {
+                _isTestingConnection.value = false
+            }
+        }
+    }
+
     fun clearError() {
         _errorMessage.value = null
     }
 }
+
+@Composable
+private fun ApiTestResultCard(result: TestConnectionResult) {
+    val (icon, message, containerColor, contentColor) = if (result.targetModelAvailable) {
+        TestResultVisuals(
+            icon = "✅",
+            message = "API 连接正常，检测到 ${result.availableModelCount} 个模型",
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+        )
+    } else {
+        TestResultVisuals(
+            icon = "⚠️",
+            message = "API 可访问，但未找到配置的模型",
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+        )
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = containerColor)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            Text(
+                text = icon,
+                style = MaterialTheme.typography.headlineSmall,
+                color = contentColor
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = contentColor
+                )
+                Text(
+                    text = "当前模型: ${if (result.targetModelAvailable) "可用" else "未找到"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = contentColor.copy(alpha = 0.85f)
+                )
+            }
+        }
+    }
+}
+
+private data class TestResultVisuals(
+    val icon: String,
+    val message: String,
+    val containerColor: Color,
+    val contentColor: Color
+)
