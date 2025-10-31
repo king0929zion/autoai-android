@@ -41,16 +41,24 @@ class ScreenCapture @Inject constructor(
 
             Timber.d("开始捕获屏幕...")
             
-            // 使用 Shizuku 执行 screencap 命令
+            // 使用 Shizuku 执行 screencap 命令，增加错误处理
             val process = Shizuku.newProcess(
                 arrayOf("sh", "-c", "screencap -p"),
                 null,
                 null
             )
             
-            // 读取输出流为 Bitmap
-            val bitmap = BitmapFactory.decodeStream(process.inputStream)
-            process.waitFor()
+            // 增加超时检查
+            val hasFinished = process.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
+            if (!hasFinished) {
+                process.destroy()
+                return@withContext Result.failure(Exception("截图超时"))
+            }
+            
+            // 读取输出流为 Bitmap，增加资源管理
+            val bitmap = process.inputStream.use { inputStream ->
+                BitmapFactory.decodeStream(inputStream)
+            }
             
             if (bitmap != null) {
                 Timber.d("截图成功: ${bitmap.width}x${bitmap.height}")

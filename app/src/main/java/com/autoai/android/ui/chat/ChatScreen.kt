@@ -465,7 +465,7 @@ class ChatViewModel @Inject constructor(
         _messages.value = listOf(
             ChatMessage(
                 id = "welcome",
-                content = "你好！我是 AI 自动控机助手。\n\n请告诉我你想要完成的任务，例如：\n• 打开微信\n• 在淘宝搜索机械键盘\n• 截图保存",
+                content = "你好！我是 AI 自动控机助手。\n\n请告诉我你想要完成的任务，例如：\n• 打开微信\n• 在淘宝搜索机械键盘\n• 截图保存\n\n💡 提示：复杂任务建议分步执行以提高成功率",
                 isUser = false
             )
         )
@@ -477,7 +477,7 @@ class ChatViewModel @Inject constructor(
 
     fun sendMessage() {
         val text = _inputText.value.trim()
-        if (text.isBlank()) return
+        if (text.isBlank() || _isProcessing.value) return
 
         // 添加用户消息
         val userMessage = ChatMessage(
@@ -539,12 +539,14 @@ class ChatViewModel @Inject constructor(
                 } else {
                     val error = result.exceptionOrNull()
                     val errorMsg = when {
-                        error?.message?.contains("API") == true -> 
+                        error?.message?.contains("API", ignoreCase = true) == true -> 
                             "API 调用失败\n请检查网络连接和 API Key 配置"
-                        error?.message?.contains("Shizuku") == true -> 
+                        error?.message?.contains("Shizuku", ignoreCase = true) == true -> 
                             "Shizuku 服务异常\n请确保 Shizuku 正在运行"
-                        error?.message?.contains("Permission") == true -> 
+                        error?.message?.contains("Permission", ignoreCase = true) == true -> 
                             "权限不足\n请授予必要的权限"
+                        error?.message?.contains("timeout", ignoreCase = true) == true ->
+                            "操作超时\n请稍后重试或简化任务"
                         else -> error?.message ?: "未知错误"
                     }
                     
@@ -575,5 +577,18 @@ class ChatViewModel @Inject constructor(
                 _isProcessing.value = false
             }
         }
+    }
+    
+    /**
+     * 清空消息历史
+     */
+    fun clearMessages() {
+        _messages.value = listOf(
+            ChatMessage(
+                id = "welcome_${System.currentTimeMillis()}",
+                content = "对话历史已清空，请告诉我新的任务需求！",
+                isUser = false
+            )
+        )
     }
 }

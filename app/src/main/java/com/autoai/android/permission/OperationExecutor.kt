@@ -108,7 +108,14 @@ class OperationExecutor @Inject constructor(
 
     private suspend fun executeInput(text: String): ActionResult {
         Timber.d("输入文本: %s", text)
-        val escaped = text.replace(" ", "%s")
+        // 改进的文本转义处理，支持更多特殊字符
+        val escaped = text
+            .replace(" ", "%s")
+            .replace("&", "%26") 
+            .replace("<", "%3c")
+            .replace(">", "%3e")
+            .replace("|", "%7c")
+            .replace(";", "%3b")
         val result = executeShellCommand("input text \"$escaped\"")
         return if (result.isSuccess) {
             delay(DELAY_AFTER_INPUT)

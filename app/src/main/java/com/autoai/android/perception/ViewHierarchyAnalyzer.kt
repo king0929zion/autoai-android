@@ -111,9 +111,19 @@ class ViewHierarchyAnalyzer @Inject constructor(
     private fun dumpWindowHierarchy() {
         Timber.d("执行 uiautomator dump")
         val process = Shizuku.newProcess(arrayOf("sh", "-c", "uiautomator dump $DUMP_FILE"), null, null)
-        val exitCode = process.waitFor()
+        
+        // 增加超时检查
+        val hasFinished = process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)
+        if (!hasFinished) {
+            process.destroy()
+            throw IllegalStateException("uiautomator dump 执行超时")
+        }
+        
+        val exitCode = process.exitValue()
         if (exitCode != 0) {
-            throw IllegalStateException("uiautomator dump 执行失败，退出码: $exitCode")
+            // 读取错误信息
+            val errorText = process.errorStream.bufferedReader().use { it.readText() }
+            throw IllegalStateException("uiautomator dump 执行失败，退出码: $exitCode, 错误: $errorText")
         }
     }
 
