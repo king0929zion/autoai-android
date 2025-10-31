@@ -13,7 +13,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 通过 Shizuku 在系统层执行真实用户行为。
+ * 通过 Shizuku 调用 shell，实现对系统层真实操作的封装。
  */
 @Singleton
 class OperationExecutor @Inject constructor(
@@ -39,13 +39,13 @@ class OperationExecutor @Inject constructor(
                 is Action.Complete -> ActionResult.success(action.message)
                 is Action.Error -> ActionResult.failure(action.message)
                 is Action.RequestUserHelp -> ActionResult.failure(
-                    message = "需要用户介入: ${action.reason}",
+                    message = "需要用户介入：${action.reason}",
                     needsUserConfirmation = true
                 )
             }
         }.getOrElse { error ->
             Timber.e(error, "执行动作失败: $action")
-            ActionResult.failure("执行失败: ${error.message}")
+            ActionResult.failure("执行失败：${error.message}")
         }
 
         result.copy(executionTimeMs = System.currentTimeMillis() - start)
@@ -56,13 +56,12 @@ class OperationExecutor @Inject constructor(
             return@withContext Result.failure(IllegalStateException("Shizuku 未就绪"))
         }
 
-        return@withContext runCatching {
-            val command = "dumpsys window windows | grep -E 'mCurrentFocus|mFocusedApp'"
-            val shell = executeShellCommand(command)
-            if (!shell.isSuccess) error(shell.errorMessage.ifBlank { "无法获取前台应用" })
+        runCatching {
+            val dump = executeShellCommand("dumpsys window windows")
+            if (!dump.isSuccess) error(dump.errorMessage.ifBlank { "无法获取前台应用" })
 
-            parsePackageName(shell.output).also {
-                require(it.isNotBlank()) { "未能解析前台应用包名" }
+            parsePackageName(dump.output).also { packageName ->
+                require(packageName.isNotBlank()) { "未能解析前台应用包名" }
             }
         }.onFailure { Timber.e(it, "获取前台应用失败") }
     }
@@ -74,18 +73,18 @@ class OperationExecutor @Inject constructor(
             delay(DELAY_AFTER_CLICK)
             ActionResult.success("已点击 ($x, $y)")
         } else {
-            ActionResult.failure("点击失败: ${result.errorMessage}")
+            ActionResult.failure("点击失败：${result.errorMessage}")
         }
     }
 
     private suspend fun executeLongClick(x: Int, y: Int, durationMs: Long): ActionResult {
-        Timber.d("长按坐标: (%d, %d) 持续 %dms", x, y, durationMs)
+        Timber.d("长按坐标: (%d, %d)，持续 %dms", x, y, durationMs)
         val result = executeShellCommand("input swipe $x $y $x $y $durationMs")
         return if (result.isSuccess) {
             delay(DELAY_AFTER_CLICK)
             ActionResult.success("已长按 ($x, $y)")
         } else {
-            ActionResult.failure("长按失败: ${result.errorMessage}")
+            ActionResult.failure("长按失败：${result.errorMessage}")
         }
     }
 
@@ -101,16 +100,15 @@ class OperationExecutor @Inject constructor(
             delay(DELAY_AFTER_SWIPE)
             ActionResult.success("滑动完成")
         } else {
-            ActionResult.failure("滑动失败: ${result.errorMessage}")
+            ActionResult.failure("滑动失败：${result.errorMessage}")
         }
     }
 
     private suspend fun executeInput(text: String): ActionResult {
         Timber.d("输入文本: %s", text)
-        // 改进的文本转义处理，支持更多特殊字符
         val escaped = text
             .replace(" ", "%s")
-            .replace("&", "%26") 
+            .replace("&", "%26")
             .replace("<", "%3c")
             .replace(">", "%3e")
             .replace("|", "%7c")
@@ -120,7 +118,7 @@ class OperationExecutor @Inject constructor(
             delay(DELAY_AFTER_INPUT)
             ActionResult.success("输入文本完成")
         } else {
-            ActionResult.failure("输入失败: ${result.errorMessage}")
+            ActionResult.failure("输入失败：${result.errorMessage}")
         }
     }
 
@@ -131,7 +129,7 @@ class OperationExecutor @Inject constructor(
             delay(DELAY_AFTER_KEY)
             ActionResult.success("按键完成")
         } else {
-            ActionResult.failure("按键失败: ${result.errorMessage}")
+            ActionResult.failure("按键失败：${result.errorMessage}")
         }
     }
 
@@ -142,9 +140,9 @@ class OperationExecutor @Inject constructor(
         )
         return if (result.isSuccess) {
             delay(DELAY_AFTER_LAUNCH_APP)
-            ActionResult.success("已打开应用: $packageName")
+            ActionResult.success("已打开应用：$packageName")
         } else {
-            ActionResult.failure("打开应用失败: ${result.errorMessage}")
+            ActionResult.failure("打开应用失败：${result.errorMessage}")
         }
     }
 
@@ -159,8 +157,17 @@ class OperationExecutor @Inject constructor(
     }
 
     private fun parsePackageName(output: String): String {
-        val regex = """([a-zA-Z0-9._]+)/(?:[a-zA-Z0-9._]+)""".toRegex()
-        return regex.find(output)?.groupValues?.getOrNull(1).orEmpty()
+        val normalized = output.replace('\r', '\n')
+        val patterns = listOf(
+            """mCurrentFocus=Window\{[^}]+\s([a-zA-Z0-9._]+)/""".toRegex(),
+            """mFocusedApp=AppWindowToken\{[^}]+\s([a-zA-Z0-9._]+)/""".toRegex(),
+            """mFocusedApp=ActivityRecord\{[^}]+\s([a-zA-Z0-9._]+)/""".toRegex()
+        )
+        for (pattern in patterns) {
+            pattern.find(normalized)?.groupValues?.getOrNull(1)?.let { return it }
+        }
+        Timber.w("未找到前台应用包名，原始输出：%s", normalized.take(512))
+        return ""
     }
 
     companion object {

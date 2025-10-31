@@ -15,23 +15,19 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 使用 Shizuku + UIAutomator 抽取当前前台应用的控件树
+ * 通过 Shizuku + uiautomator dump 生成当前界面的控件树。
  */
 @Singleton
 class ViewHierarchyAnalyzer @Inject constructor(
     private val shizukuManager: ShizukuManager
 ) {
-    companion object {
-        private const val DUMP_DIR = "/data/local/tmp/autoai"
-        private const val DUMP_FILE = "$DUMP_DIR/window_dump.xml"
-    }
 
     suspend fun getViewHierarchy(): Result<ViewNode> = withContext(Dispatchers.IO) {
         if (!shizukuManager.isShizukuAvailable()) {
             return@withContext Result.failure(IllegalStateException("Shizuku 未就绪，无法获取控件树"))
         }
 
-        return@withContext runCatching {
+        runCatching {
             ensureDumpDirectory()
             dumpWindowHierarchy()
             val xmlContent = readDumpFile()
@@ -42,9 +38,7 @@ class ViewHierarchyAnalyzer @Inject constructor(
     fun extractAllText(root: ViewNode): List<String> {
         val result = mutableListOf<String>()
         fun traverse(node: ViewNode) {
-            if (node.text.isNotBlank()) {
-                result.add(node.text)
-            }
+            if (node.text.isNotBlank()) result.add(node.text)
             if (node.contentDescription.isNotBlank() && node.contentDescription != node.text) {
                 result.add(node.contentDescription)
             }
@@ -57,9 +51,7 @@ class ViewHierarchyAnalyzer @Inject constructor(
     fun getClickableNodes(root: ViewNode): List<ViewNode> {
         val result = mutableListOf<ViewNode>()
         fun traverse(node: ViewNode) {
-            if (node.clickable && node.enabled) {
-                result.add(node)
-            }
+            if (node.clickable && node.enabled) result.add(node)
             node.children.forEach { traverse(it) }
         }
         traverse(root)
@@ -69,23 +61,23 @@ class ViewHierarchyAnalyzer @Inject constructor(
     fun findNodesByText(root: ViewNode, text: String, exactMatch: Boolean = false): List<ViewNode> {
         if (text.isBlank()) return emptyList()
 
-        val matcher = if (exactMatch) text else text.lowercase()
-        val nodes = mutableListOf<ViewNode>()
+        val target = if (exactMatch) text else text.lowercase()
+        val result = mutableListOf<ViewNode>()
+
         fun traverse(node: ViewNode) {
             val nodeText = if (exactMatch) node.text else node.text.lowercase()
             val nodeDesc = if (exactMatch) node.contentDescription else node.contentDescription.lowercase()
             val matched = if (exactMatch) {
-                nodeText == matcher || nodeDesc == matcher
+                nodeText == target || nodeDesc == target
             } else {
-                nodeText.contains(matcher) || nodeDesc.contains(matcher)
+                nodeText.contains(target) || nodeDesc.contains(target)
             }
-            if (matched) {
-                nodes.add(node)
-            }
+            if (matched) result.add(node)
             node.children.forEach { traverse(it) }
         }
+
         traverse(root)
-        return nodes
+        return result
     }
 
     fun findNodeByResourceId(root: ViewNode, resourceId: String): ViewNode? {
@@ -93,8 +85,7 @@ class ViewHierarchyAnalyzer @Inject constructor(
         fun traverse(node: ViewNode): ViewNode? {
             if (node.resourceId == resourceId) return node
             node.children.forEach { child ->
-                val hit = traverse(child)
-                if (hit != null) return hit
+                traverse(child)?.let { return it }
             }
             return null
         }
@@ -103,24 +94,21 @@ class ViewHierarchyAnalyzer @Inject constructor(
 
     private fun ensureDumpDirectory() {
         val dir = File(DUMP_DIR)
-        if (dir.exists()) {
-            return
-        }
+        if (dir.exists()) return
 
         val result = ShizukuShell.executeCommand("mkdir", "-p", DUMP_DIR)
         if (!result.isSuccess) {
             val reason = result.errorMessage.ifBlank { result.output.ifBlank { "未知错误" } }
-            throw IllegalStateException("无法创建控件树导出目录: $reason")
+            throw IllegalStateException("无法创建控件树导出目录：$reason")
         }
     }
 
     private fun dumpWindowHierarchy() {
         Timber.d("执行 uiautomator dump")
-
         ShizukuShell.executeCommand("rm", "-f", DUMP_FILE)
         val result = ShizukuShell.executeCommandWithTimeout(15, "uiautomator", "dump", DUMP_FILE)
         if (!result.isSuccess) {
-            throw IllegalStateException("uiautomator dump 执行失败: ${result.errorMessage}")
+            throw IllegalStateException("uiautomator dump 执行失败：${result.errorMessage}")
         }
     }
 
@@ -128,10 +116,10 @@ class ViewHierarchyAnalyzer @Inject constructor(
         val readResult = ShizukuShell.executeCommandWithTimeout(10, "cat", DUMP_FILE)
         if (!readResult.isSuccess || readResult.output.isBlank()) {
             val message = readResult.errorMessage.ifBlank { "控件树文件读取为空" }
-            throw IllegalStateException("读取控件树文件失败: $message")
+            throw IllegalStateException("读取控件树文件失败：$message")
         }
 
-        runCatching { ShizukuShell.executeCommand("rm", DUMP_FILE) }
+        runCatching { ShizukuShell.executeCommand("rm", "-f", DUMP_FILE) }
             .onFailure { Timber.w(it, "删除控件树临时文件失败: $DUMP_FILE") }
 
         return readResult.output
@@ -153,9 +141,7 @@ class ViewHierarchyAnalyzer @Inject constructor(
                 }
                 XmlPullParser.END_TAG -> if (parser.name == "node") {
                     val finished = stack.removeLast()
-                    if (stack.isEmpty()) {
-                        return finished
-                    }
+                    if (stack.isEmpty()) return finished
                 }
             }
             eventType = parser.next()
@@ -203,5 +189,10 @@ class ViewHierarchyAnalyzer @Inject constructor(
             Timber.w(e, "解析 bounds 失败: %s", bounds)
             Rect()
         }
+    }
+
+    companion object {
+        private const val DUMP_DIR = "/data/local/tmp/autoai"
+        private const val DUMP_FILE = "$DUMP_DIR/window_dump.xml"
     }
 }
