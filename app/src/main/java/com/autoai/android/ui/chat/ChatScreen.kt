@@ -2,6 +2,8 @@
 
 package com.autoai.android.ui.chat
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,7 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.animateItemPlacement
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,12 +30,13 @@ import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -131,20 +134,16 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            QuickActionRow(
-                actions = viewModel.quickActions,
-                onActionSelected = { viewModel.updateInputText(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            )
+            AnimatedVisibility(visible = isProcessing) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+            }
 
-            Divider(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                color = MaterialTheme.colorScheme.outlineVariant
-            )
+            Spacer(modifier = Modifier.height(8.dp))
 
             LazyColumn(
                 state = listState,
@@ -155,7 +154,10 @@ fun ChatScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(items = messages, key = { it.id }) { message ->
-                    MessageBubble(message)
+                    MessageBubble(
+                        message = message,
+                        modifier = Modifier.animateItemPlacement()
+                    )
                 }
             }
 
@@ -180,37 +182,6 @@ fun ChatScreen(
 }
 
 @Composable
-private fun QuickActionRow(
-    actions: List<QuickAction>,
-    onActionSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    if (actions.isEmpty()) return
-
-    LazyRow(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        items(actions) { action ->
-            Surface(
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Text(
-                    text = action.label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(24.dp))
-                        .clickable { onActionSelected(action.command) }
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun ChatInputBar(
     modifier: Modifier = Modifier,
     text: String,
@@ -225,6 +196,7 @@ private fun ChatInputBar(
         onValueChange = onTextChange,
         modifier = modifier
             .fillMaxWidth()
+            .animateContentSize()
             .heightIn(min = 56.dp),
         placeholder = { Text("请输入要执行的任务") },
         enabled = enabled,
@@ -264,7 +236,10 @@ private fun ChatInputBar(
 }
 
 @Composable
-private fun MessageBubble(message: ChatMessage) {
+private fun MessageBubble(
+    message: ChatMessage,
+    modifier: Modifier = Modifier
+) {
     val isUser = message.isUser
     val alignment = if (isUser) Alignment.End else Alignment.Start
     val bubbleShape = RoundedCornerShape(
@@ -275,10 +250,11 @@ private fun MessageBubble(message: ChatMessage) {
     )
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalAlignment = alignment
     ) {
         Surface(
+            modifier = Modifier.animateContentSize(),
             shape = bubbleShape,
             color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
             tonalElevation = if (isUser) 4.dp else 0.dp
@@ -294,9 +270,11 @@ private fun MessageBubble(message: ChatMessage) {
                 Modifier
                     .clip(bubbleShape)
                     .background(gradientBrush)
+                    .animateContentSize()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             } else {
                 Modifier
+                    .animateContentSize()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             }
 
@@ -327,7 +305,9 @@ private fun TaskStatusCard(task: Task) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         tonalElevation = 2.dp,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize()
     ) {
         Column(
             modifier = Modifier
@@ -375,11 +355,6 @@ private fun formatTimestamp(timestamp: Long): String {
     return formatter.format(timestamp)
 }
 
-data class QuickAction(
-    val label: String,
-    val command: String
-)
-
 data class ChatMessage(
     val id: String,
     val content: String,
@@ -392,14 +367,6 @@ data class ChatMessage(
 class ChatViewModel @Inject constructor(
     private val taskManager: TaskManager
 ) : ViewModel() {
-
-    val quickActions = listOf(
-        QuickAction("打开微信", "打开微信"),
-        QuickAction("打开系统设置", "打开系统设置"),
-        QuickAction("截图并保存", "截图并保存"),
-        QuickAction("播放音乐", "播放音乐"),
-        QuickAction("在浏览器搜索", "在浏览器搜索")
-    )
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(
         listOf(
