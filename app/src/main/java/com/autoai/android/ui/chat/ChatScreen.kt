@@ -193,7 +193,7 @@ fun ChatScreen(
                             }
                         ) { processing ->
                             if (processing) {
-                                CircularProgressIndicator(
+                                androidx.compose.material.CircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
                                     color = MaterialTheme.colorScheme.onPrimary,
                                     strokeWidth = 2.dp
