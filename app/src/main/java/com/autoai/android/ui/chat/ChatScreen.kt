@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.CircularProgressIndicator as MaterialCircularProgressIndicator
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,7 +53,7 @@ fun ChatScreen(
     val isProcessing by viewModel.isProcessing.collectAsState()
     val listState = rememberLazyListState()
 
-    // 自动滚动到最新消息
+    // 自动滚动到最新消�?
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
@@ -67,7 +68,7 @@ fun ChatScreen(
                         Text("AI 自动控机")
                         if (isProcessing) {
                             Text(
-                                text = "正在思考...",
+                                text = "正在思�?..",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -100,7 +101,7 @@ fun ChatScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // 快捷任务栏
+            // 快捷任务�?
             QuickTaskBar(
                 onTaskClick = { taskText ->
                     viewModel.updateInputText(taskText)
@@ -136,7 +137,7 @@ fun ChatScreen(
                 }
             }
 
-            // 输入框区域
+            // 输入框区�?
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shadowElevation = 8.dp,
@@ -193,7 +194,7 @@ fun ChatScreen(
                             }
                         ) { processing ->
                             if (processing) {
-                                androidx.compose.material.CircularProgressIndicator(
+                                MaterialCircularProgressIndicator(
                                     modifier = Modifier.size(24.dp),
                                     color = MaterialTheme.colorScheme.onPrimary,
                                     strokeWidth = 2.dp
@@ -201,7 +202,7 @@ fun ChatScreen(
                             } else {
                                 Icon(
                                     Icons.Default.Send, 
-                                    "发送",
+                                    "发�?,
                                     tint = if (inputText.isNotBlank()) {
                                         MaterialTheme.colorScheme.onPrimary
                                     } else {
@@ -218,7 +219,7 @@ fun ChatScreen(
 }
 
 /**
- * 快捷任务栏
+ * 快捷任务�?
  */
 @Composable
 fun QuickTaskBar(
@@ -228,8 +229,8 @@ fun QuickTaskBar(
         listOf(
             QuickTask("📱 打开微信", "打开微信", Icons.Default.Phone),
             QuickTask("📧 打开邮箱", "打开邮箱", Icons.Default.Email),
-            QuickTask("📷 截图", "截图并保存", Icons.Default.Face),
-            QuickTask("🎵 播放音乐", "打开音乐播放器", Icons.Default.Star),
+            QuickTask("📷 截图", "截图并保�?, Icons.Default.Face),
+            QuickTask("🎵 播放音乐", "打开音乐播放�?, Icons.Default.Star),
             QuickTask("🔍 搜索", "在浏览器搜索", Icons.Default.Search)
         )
     }
@@ -272,13 +273,13 @@ data class QuickTask(
 )
 
 /**
- * 消息气泡 - 增强版
+ * 消息气泡 - 增强�?
  */
 @Composable
 fun MessageBubble(message: ChatMessage) {
     val alignment = if (message.isUser) Alignment.End else Alignment.Start
     
-    // 使用渐变色作为背景
+    // 使用渐变色作为背�?
     val backgroundBrush = if (message.isUser) {
         Brush.linearGradient(
             colors = listOf(
@@ -336,13 +337,13 @@ fun MessageBubble(message: ChatMessage) {
                     }
                 )
                 
-                // 显示任务状态
+                // 显示任务状�?
                 if (message.task != null) {
                     Spacer(modifier = Modifier.height(8.dp))
                     TaskStatusCard(message.task)
                 }
                 
-                // 时间戳
+                // 时间�?
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = formatTimestamp(message.timestamp),
@@ -366,8 +367,8 @@ fun formatTimestamp(timestamp: Long): String {
     val diff = now - timestamp
     return when {
         diff < 60_000 -> "刚刚"
-        diff < 3600_000 -> "${diff / 60_000}分钟前"
-        diff < 86400_000 -> "${diff / 3600_000}小时前"
+        diff < 3600_000 -> "${diff / 60_000}分钟�?
+        diff < 86400_000 -> "${diff / 3600_000}小时�?
         else -> {
             val date = java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.getDefault())
             date.format(java.util.Date(timestamp))
@@ -376,7 +377,7 @@ fun formatTimestamp(timestamp: Long): String {
 }
 
 /**
- * 任务状态卡片
+ * 任务状态卡�?
  */
 @Composable
 fun TaskStatusCard(task: Task) {
@@ -388,21 +389,21 @@ fun TaskStatusCard(task: Task) {
         Column(
             modifier = Modifier.padding(8.dp)
         ) {
-            // 状态
+            // 状�?
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val statusText = when (task.status) {
-                    TaskStatus.PENDING -> "等待中"
-                    TaskStatus.RUNNING -> "执行中"
-                    TaskStatus.PAUSED -> "已暂停"
-                    TaskStatus.COMPLETED -> "已完成"
+                    TaskStatus.PENDING -> "等待�?
+                    TaskStatus.RUNNING -> "执行�?
+                    TaskStatus.PAUSED -> "已暂�?
+                    TaskStatus.COMPLETED -> "已完�?
                     TaskStatus.FAILED -> "失败"
-                    TaskStatus.CANCELLED -> "已取消"
+                    TaskStatus.CANCELLED -> "已取�?
                 }
                 
                 Text(
-                    text = "状态: $statusText",
+                    text = "状�? $statusText",
                     style = MaterialTheme.typography.bodySmall,
                     color = when (task.status) {
                         TaskStatus.RUNNING -> MaterialTheme.colorScheme.primary
@@ -466,7 +467,7 @@ class ChatViewModel @Inject constructor(
         _messages.value = listOf(
             ChatMessage(
                 id = "welcome",
-                content = "你好！我是 AI 自动控机助手。\n\n请告诉我你想要完成的任务，例如：\n• 打开微信\n• 在淘宝搜索机械键盘\n• 截图保存\n\n💡 提示：复杂任务建议分步执行以提高成功率",
+                content = "你好！我�?AI 自动控机助手。\n\n请告诉我你想要完成的任务，例如：\n�?打开微信\n�?在淘宝搜索机械键盘\n�?截图保存\n\n💡 提示：复杂任务建议分步执行以提高成功�?,
                 isUser = false
             )
         )
@@ -493,9 +494,9 @@ class ChatViewModel @Inject constructor(
         // 执行任务
         viewModelScope.launch {
             try {
-                Timber.d("开始执行任务: $text")
+                Timber.d("开始执行任�? $text")
                 
-                // 添加处理中消息
+                // 添加处理中消�?
                 val processingMessageId = "${System.currentTimeMillis()}_processing"
                 val processingMessage = ChatMessage(
                     id = processingMessageId,
@@ -510,9 +511,9 @@ class ChatViewModel @Inject constructor(
                     val progressContent = when (task.status) {
                         TaskStatus.RUNNING -> {
                             if (task.currentStep > 0) {
-                                "⚡ 正在执行第 ${task.currentStep} 步..."
+                                "�?正在执行�?${task.currentStep} �?.."
                             } else {
-                                "🤖 AI 正在思考..."
+                                "🤖 AI 正在思�?.."
                             }
                         }
                         else -> "🤖 正在处理..."
@@ -525,15 +526,15 @@ class ChatViewModel @Inject constructor(
                     _messages.value = updatedMessages
                 }
                 
-                // 移除处理中消息
+                // 移除处理中消�?
                 _messages.value = _messages.value.dropLast(1)
                 
                 // 添加结果消息
                 val resultMessage = if (result.isSuccess) {
-                    val successContent = result.getOrNull() ?: "任务已完成"
+                    val successContent = result.getOrNull() ?: "任务已完�?
                     ChatMessage(
                         id = "${System.currentTimeMillis()}_result",
-                        content = "✅ 任务完成\n\n$successContent",
+                        content = "�?任务完成\n\n$successContent",
                         isUser = false,
                         task = taskManager.currentTask.value
                     )
@@ -543,17 +544,17 @@ class ChatViewModel @Inject constructor(
                         error?.message?.contains("API", ignoreCase = true) == true -> 
                             "API 调用失败\n请检查网络连接和 API Key 配置"
                         error?.message?.contains("Shizuku", ignoreCase = true) == true -> 
-                            "Shizuku 服务异常\n请确保 Shizuku 正在运行"
+                            "Shizuku 服务异常\n请确�?Shizuku 正在运行"
                         error?.message?.contains("Permission", ignoreCase = true) == true -> 
                             "权限不足\n请授予必要的权限"
                         error?.message?.contains("timeout", ignoreCase = true) == true ->
-                            "操作超时\n请稍后重试或简化任务"
+                            "操作超时\n请稍后重试或简化任�?
                         else -> error?.message ?: "未知错误"
                     }
                     
                     ChatMessage(
                         id = "${System.currentTimeMillis()}_error",
-                        content = "❌ 任务失败\n\n$errorMsg\n\n💡 建议：尝试简化任务描述或分步执行",
+                        content = "�?任务失败\n\n$errorMsg\n\n💡 建议：尝试简化任务描述或分步执行",
                         isUser = false,
                         task = taskManager.currentTask.value
                     )
