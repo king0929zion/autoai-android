@@ -11,8 +11,7 @@ import javax.inject.Singleton
 import kotlin.jvm.Volatile
 
 /**
- * Shizuku 服务状态管理器
- * 负责监听权限状态与 binder 生命周期，向 UI 暴露实时状态。
+ * Manages Shizuku binder state and permission status, exposing updates to the UI layer.
  */
 @Singleton
 class ShizukuManager @Inject constructor() {
@@ -24,28 +23,24 @@ class ShizukuManager @Inject constructor() {
     private var listenersRegistered = false
 
     private val permissionListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
-        Timber.d(
-            "Shizuku 权限回调: requestCode=%d granted=%s",
-            requestCode,
-            grantResult == PackageManager.PERMISSION_GRANTED
-        )
+        Timber.d("Shizuku permission callback: requestCode=%d granted=%s", requestCode, grantResult == PackageManager.PERMISSION_GRANTED)
         refreshStatus()
     }
 
     private val binderReceivedListener = Shizuku.OnBinderReceivedListener {
-        Timber.d("Shizuku binder 已连接")
+        Timber.d("Shizuku binder connected")
         refreshStatus()
     }
 
     private val binderDeadListener = Shizuku.OnBinderDeadListener {
-        Timber.w("Shizuku binder 已断开")
+        Timber.w("Shizuku binder disconnected")
         _shizukuStatus.value = ShizukuStatus.NOT_RUNNING
     }
 
     @Synchronized
     fun initialize() {
         if (listenersRegistered) {
-            Timber.d("ShizukuManager 已初始化，刷新当前状态")
+            Timber.d("ShizukuManager already initialized, refreshing status")
             refreshStatus()
             return
         }
@@ -56,10 +51,10 @@ class ShizukuManager @Inject constructor() {
             Shizuku.addRequestPermissionResultListener(permissionListener)
             listenersRegistered = true
             refreshStatus()
-            Timber.i("ShizukuManager 初始化完成")
+            Timber.i("ShizukuManager initialization complete")
         }.onFailure {
             listenersRegistered = false
-            Timber.e(it, "ShizukuManager 初始化失败")
+            Timber.e(it, "Failed to initialize ShizukuManager")
             _shizukuStatus.value = ShizukuStatus.NOT_INSTALLED
         }
     }
@@ -73,9 +68,9 @@ class ShizukuManager @Inject constructor() {
             Shizuku.removeBinderReceivedListener(binderReceivedListener)
             Shizuku.removeBinderDeadListener(binderDeadListener)
             listenersRegistered = false
-            Timber.d("ShizukuManager 清理完成")
+            Timber.d("ShizukuManager cleaned up")
         }.onFailure {
-            Timber.e(it, "ShizukuManager 清理失败")
+            Timber.e(it, "Failed to clean up ShizukuManager")
         }
     }
 
@@ -86,46 +81,46 @@ class ShizukuManager @Inject constructor() {
 
         return runCatching {
             if (!Shizuku.pingBinder()) {
-                Timber.w("Shizuku binder 未响应")
+                Timber.w("Shizuku binder not responding")
                 return@runCatching false
             }
             if (Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
-                Timber.w("Shizuku 权限未授予")
+                Timber.w("Shizuku permission not granted")
                 return@runCatching false
             }
             true
         }.getOrElse {
-            Timber.e(it, "检查 Shizuku 可用性失败")
+            Timber.e(it, "Failed to check Shizuku availability")
             false
         }
     }
 
     fun requestPermission(): Boolean = runCatching {
         if (!Shizuku.pingBinder()) {
-            Timber.w("Shizuku 未运行，无法申请权限")
+            Timber.w("Shizuku not running, cannot request permission")
             _shizukuStatus.value = ShizukuStatus.NOT_RUNNING
             return@runCatching false
         }
 
         when (Shizuku.checkSelfPermission()) {
             PackageManager.PERMISSION_GRANTED -> {
-                Timber.d("Shizuku 权限已授予")
+                Timber.d("Shizuku permission already granted")
                 _shizukuStatus.value = ShizukuStatus.AVAILABLE
                 true
             }
             PackageManager.PERMISSION_DENIED -> {
                 if (Shizuku.shouldShowRequestPermissionRationale()) {
-                    Timber.d("需要显示权限说明")
+                    Timber.d("Should show Shizuku permission rationale")
                 }
                 Shizuku.requestPermission(REQUEST_CODE_SHIZUKU)
                 _shizukuStatus.value = ShizukuStatus.PERMISSION_REQUIRED
-                Timber.d("已发起 Shizuku 权限请求")
+                Timber.d("Requested Shizuku permission")
                 true
             }
             else -> false
         }
     }.getOrElse {
-        Timber.e(it, "申请 Shizuku 权限失败")
+        Timber.e(it, "Failed to request Shizuku permission")
         _shizukuStatus.value = ShizukuStatus.ERROR
         false
     }
@@ -133,7 +128,7 @@ class ShizukuManager @Inject constructor() {
     fun getShizukuVersion(): Int = runCatching {
         Shizuku.getVersion()
     }.getOrElse {
-        Timber.e(it, "获取 Shizuku 版本失败")
+        Timber.e(it, "Failed to obtain Shizuku version")
         -1
     }
 
@@ -141,24 +136,24 @@ class ShizukuManager @Inject constructor() {
         val status = runCatching {
             when {
                 !isInstalled() -> {
-                    Timber.d("Shizuku 未安装")
+                    Timber.d("Shizuku not installed")
                     ShizukuStatus.NOT_INSTALLED
                 }
                 !Shizuku.pingBinder() -> {
-                    Timber.d("Shizuku 未运行")
+                    Timber.d("Shizuku not running")
                     ShizukuStatus.NOT_RUNNING
                 }
                 Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED -> {
-                    Timber.d("Shizuku 权限未授予")
+                    Timber.d("Shizuku permission missing")
                     ShizukuStatus.PERMISSION_REQUIRED
                 }
                 else -> {
-                    Timber.d("Shizuku 可正常使用")
+                    Timber.d("Shizuku is available")
                     ShizukuStatus.AVAILABLE
                 }
             }
         }.getOrElse {
-            Timber.e(it, "刷新 Shizuku 状态失败")
+            Timber.e(it, "Failed to refresh Shizuku status")
             ShizukuStatus.ERROR
         }
 

@@ -1,7 +1,10 @@
 package com.autoai.android.perception
 
 import android.graphics.Rect
-import com.autoai.android.data.model.ScreenState.ViewNode
+import com.autoai.android.accessibility.AccessibilityBridge
+import com.autoai.android.data.model.ScreenState
+import com.autoai.android.permission.ControlMode
+import com.autoai.android.permission.ControlPreferencesRepository
 import com.autoai.android.permission.ShizukuManager
 import com.autoai.android.utils.ShizukuShell
 import kotlinx.coroutines.Dispatchers
@@ -15,14 +18,28 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 通过 Shizuku + uiautomator dump 生成当前界面的控件树。
+ * 控件树分析器，支持 Shizuku + uiautomator 与无障碍直接遍历两种模式。
  */
 @Singleton
 class ViewHierarchyAnalyzer @Inject constructor(
-    private val shizukuManager: ShizukuManager
+    private val controlPreferencesRepository: ControlPreferencesRepository,
+    private val shizukuManager: ShizukuManager,
+    private val accessibilityBridge: AccessibilityBridge
 ) {
 
-    suspend fun getViewHierarchy(): Result<ViewNode> = withContext(Dispatchers.IO) {
+    suspend fun getViewHierarchy(): Result<ScreenState.ViewNode> {
+        return when (controlPreferencesRepository.getCurrentMode()) {
+            ControlMode.SHIZUKU -> getViewHierarchyViaShizuku()
+            ControlMode.ACCESSIBILITY -> accessibilityBridge.buildViewHierarchy()
+        }
+    }
+
+    suspend fun extractAllText(root: ScreenState.ViewNode): List<String> =
+        withContext(Dispatchers.Default) {
+            accessibilityBridge.extractAllTexts(root)
+        }
+
+    private suspend fun getViewHierarchyViaShizuku(): Result<ScreenState.ViewNode> = withContext(Dispatchers.IO) {
         if (!shizukuManager.isShizukuAvailable()) {
             return@withContext Result.failure(IllegalStateException("Shizuku 未就绪，无法获取控件树"))
         }
@@ -33,63 +50,6 @@ class ViewHierarchyAnalyzer @Inject constructor(
             val xmlContent = readDumpFile()
             parseXml(xmlContent)
         }.onFailure { Timber.e(it, "解析控件树失败") }
-    }
-
-    fun extractAllText(root: ViewNode): List<String> {
-        val result = mutableListOf<String>()
-        fun traverse(node: ViewNode) {
-            if (node.text.isNotBlank()) result.add(node.text)
-            if (node.contentDescription.isNotBlank() && node.contentDescription != node.text) {
-                result.add(node.contentDescription)
-            }
-            node.children.forEach { traverse(it) }
-        }
-        traverse(root)
-        return result
-    }
-
-    fun getClickableNodes(root: ViewNode): List<ViewNode> {
-        val result = mutableListOf<ViewNode>()
-        fun traverse(node: ViewNode) {
-            if (node.clickable && node.enabled) result.add(node)
-            node.children.forEach { traverse(it) }
-        }
-        traverse(root)
-        return result
-    }
-
-    fun findNodesByText(root: ViewNode, text: String, exactMatch: Boolean = false): List<ViewNode> {
-        if (text.isBlank()) return emptyList()
-
-        val target = if (exactMatch) text else text.lowercase()
-        val result = mutableListOf<ViewNode>()
-
-        fun traverse(node: ViewNode) {
-            val nodeText = if (exactMatch) node.text else node.text.lowercase()
-            val nodeDesc = if (exactMatch) node.contentDescription else node.contentDescription.lowercase()
-            val matched = if (exactMatch) {
-                nodeText == target || nodeDesc == target
-            } else {
-                nodeText.contains(target) || nodeDesc.contains(target)
-            }
-            if (matched) result.add(node)
-            node.children.forEach { traverse(it) }
-        }
-
-        traverse(root)
-        return result
-    }
-
-    fun findNodeByResourceId(root: ViewNode, resourceId: String): ViewNode? {
-        if (resourceId.isBlank()) return null
-        fun traverse(node: ViewNode): ViewNode? {
-            if (node.resourceId == resourceId) return node
-            node.children.forEach { child ->
-                traverse(child)?.let { return it }
-            }
-            return null
-        }
-        return traverse(root)
     }
 
     private fun ensureDumpDirectory() {
@@ -115,7 +75,7 @@ class ViewHierarchyAnalyzer @Inject constructor(
     private fun readDumpFile(): String {
         val readResult = ShizukuShell.executeCommandWithTimeout(10, "cat", DUMP_FILE)
         if (!readResult.isSuccess || readResult.output.isBlank()) {
-            val message = readResult.errorMessage.ifBlank { "控件树文件读取为空" }
+            val message = readResult.errorMessage.ifBlank { "控件树文件内容为空" }
             throw IllegalStateException("读取控件树文件失败：$message")
         }
 
@@ -125,12 +85,12 @@ class ViewHierarchyAnalyzer @Inject constructor(
         return readResult.output
     }
 
-    private fun parseXml(xml: String): ViewNode {
+    private fun parseXml(xml: String): ScreenState.ViewNode {
         val parser = XmlPullParserFactory.newInstance()
             .newPullParser()
             .apply { setInput(StringReader(xml)) }
 
-        val stack = ArrayDeque<ViewNode>()
+        val stack = ArrayDeque<ScreenState.ViewNode>()
         var eventType = parser.eventType
         while (eventType != XmlPullParser.END_DOCUMENT) {
             when (eventType) {
@@ -149,7 +109,7 @@ class ViewHierarchyAnalyzer @Inject constructor(
         throw IllegalStateException("未能解析出根节点")
     }
 
-    private fun parseNode(parser: XmlPullParser): ViewNode {
+    private fun parseNode(parser: XmlPullParser): ScreenState.ViewNode {
         val className = parser.getAttributeValue(null, "class") ?: ""
         val text = parser.getAttributeValue(null, "text") ?: ""
         val contentDesc = parser.getAttributeValue(null, "content-desc") ?: ""
@@ -164,7 +124,7 @@ class ViewHierarchyAnalyzer @Inject constructor(
         val editable = parser.getAttributeValue(null, "editable") == "true" ||
             className.contains("EditText", ignoreCase = true)
 
-        return ViewNode(
+        return ScreenState.ViewNode(
             className = className,
             text = text,
             contentDescription = contentDesc,

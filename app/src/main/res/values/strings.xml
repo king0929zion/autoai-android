@@ -1,43 +1,50 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- 基础 -->
     <string name="app_name">AutoAI</string>
-    
-    <!-- 通用 -->
     <string name="ok">确定</string>
     <string name="cancel">取消</string>
     <string name="confirm">确认</string>
     <string name="retry">重试</string>
     <string name="settings">设置</string>
     <string name="back">返回</string>
-    
+
     <!-- 主界面 -->
     <string name="chat_title">AI 助手</string>
-    <string name="input_hint">告诉我你想做什么...</string>
+    <string name="input_hint">告诉我你想做什么…</string>
     <string name="send">发送</string>
     <string name="voice_input">语音输入</string>
-    
+    <string name="chat_toolbar_title">AutoAI 控机</string>
+    <string name="chat_toolbar_subtitle_ready">随时告诉我新的指令</string>
+    <string name="chat_toolbar_subtitle_running">正在执行任务…</string>
+    <string name="chat_placeholder_input">我想让你…</string>
+    <string name="chat_action_history">历史记录</string>
+    <string name="chat_action_help">帮助</string>
+    <string name="chat_action_clear">清除对话</string>
+    <string name="chat_action_send">发送</string>
+
     <!-- 任务状态 -->
     <string name="task_pending">等待开始</string>
-    <string name="task_analyzing">分析中...</string>
-    <string name="task_executing">执行中...</string>
+    <string name="task_analyzing">正在分析</string>
+    <string name="task_executing">执行中</string>
     <string name="task_paused">已暂停</string>
     <string name="task_completed">已完成</string>
     <string name="task_failed">执行失败</string>
     <string name="task_terminated">已终止</string>
-    
+
     <!-- 操作 -->
     <string name="pause_task">暂停任务</string>
     <string name="resume_task">继续任务</string>
     <string name="terminate_task">终止任务</string>
     <string name="view_details">查看详情</string>
-    
+
     <!-- 权限 -->
     <string name="shizuku_not_available">Shizuku 未安装或未激活</string>
     <string name="shizuku_permission_required">需要 Shizuku 权限才能执行操作</string>
     <string name="request_permission">申请权限</string>
     <string name="overlay_permission_required">需要悬浮窗权限</string>
     <string name="grant_permission">授予权限</string>
-    
+
     <!-- 设置 -->
     <string name="api_settings">API 设置</string>
     <string name="api_key">API 密钥</string>
@@ -45,21 +52,20 @@
     <string name="model_name">模型名称</string>
     <string name="temperature">Temperature</string>
     <string name="save">保存</string>
-    
-    <!-- 安全 -->
+
+    <!-- 安全提示 -->
     <string name="payment_detected_title">检测到支付操作</string>
-    <string name="payment_detected_message">为了您的资金安全，已自动暂停任务。\n请手动完成支付操作。</string>
+    <string name="payment_detected_message">为了您的资金安全，已自动暂停任务。请手动完成支付后再继续。</string>
     <string name="continue_after_payment">支付后继续</string>
-    
     <string name="sensitive_operation_title">敏感操作确认</string>
     <string name="sensitive_operation_message">即将执行以下操作，需要您的确认：</string>
-    
-    <!-- 错误消息 -->
+
+    <!-- 错误提示 -->
     <string name="error_network">网络连接失败</string>
     <string name="error_api">API 调用失败</string>
     <string name="error_permission">权限不足</string>
     <string name="error_unknown">未知错误</string>
-    
+
     <!-- 引导 -->
     <string name="welcome_title">欢迎使用 AutoAI</string>
     <string name="welcome_message">让 AI 帮你自动完成手机操作</string>
@@ -67,10 +73,25 @@
     <string name="setup_api">第二步：配置 API</string>
     <string name="setup_permissions">第三步：授予权限</string>
     <string name="setup_complete">开始使用</string>
-    
+
+    <!-- Chat 消息文案 -->
+    <string name="chat_message_welcome">你好，我是 AutoAI，可以帮你执行手机上的复杂操作。直接描述你的目标即可开始。</string>
+    <string name="chat_message_processing">正在分析和规划步骤…</string>
+    <string name="chat_message_default_success">操作已完成。</string>
+    <string name="chat_message_unknown_reason">原因未知</string>
+    <string name="chat_message_unknown_error_hint">请查看日志</string>
+    <string name="chat_message_clear">对话已清空，请告诉我新的目标。</string>
+    <string name="chat_result_success">✅ 已完成：
+%1$s</string>
+    <string name="chat_result_failure">⚠️ 执行失败：%1$s</string>
+    <string name="chat_result_exception">⚠️ 发生异常：%1$s</string>
+    <string name="chat_summary_title">当前任务</string>
+    <string name="chat_summary_status">状态：%1$s</string>
+
     <!-- TodoList -->
     <string name="todo_list_title">任务清单</string>
     <string name="current_step">当前步骤</string>
-    <string name="completed_steps">已完成 %1$d/%2$d 步</string>
-    <string name="estimated_time">预计剩余时间：%s</string>
+    <string name="completed_steps">已完成 %1$d/%2$d 项</string>
+    <string name="estimated_time">预计剩余时间：%1$s</string>
+
 </resources>

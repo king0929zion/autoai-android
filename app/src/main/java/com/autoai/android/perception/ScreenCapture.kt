@@ -3,6 +3,9 @@ package com.autoai.android.perception
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
+import com.autoai.android.accessibility.AccessibilityBridge
+import com.autoai.android.permission.ControlMode
+import com.autoai.android.permission.ControlPreferencesRepository
 import com.autoai.android.permission.ShizukuManager
 import com.autoai.android.utils.ShizukuShell
 import kotlinx.coroutines.Dispatchers
@@ -14,19 +17,28 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 负责通过 Shizuku 执行 screencap 命令并获取屏幕截图。
+ * 统一的屏幕截图入口，支持 Shizuku 与无障碍双模式。
  */
 @Singleton
 class ScreenCapture @Inject constructor(
-    private val shizukuManager: ShizukuManager
+    private val controlPreferencesRepository: ControlPreferencesRepository,
+    private val shizukuManager: ShizukuManager,
+    private val accessibilityBridge: AccessibilityBridge
 ) {
 
-    suspend fun captureScreen(): Result<Bitmap> = withContext(Dispatchers.IO) {
+    suspend fun captureScreen(): Result<Bitmap> {
+        return when (controlPreferencesRepository.getCurrentMode()) {
+            ControlMode.SHIZUKU -> captureViaShizuku()
+            ControlMode.ACCESSIBILITY -> captureViaAccessibility()
+        }
+    }
+
+    private suspend fun captureViaShizuku(): Result<Bitmap> = withContext(Dispatchers.IO) {
         if (!shizukuManager.isShizukuAvailable()) {
-            return@withContext Result.failure(Exception("Shizuku 未就绪"))
+            return@withContext Result.failure(Exception("Shizuku 未就绪，无法进行截图"))
         }
 
-        Timber.d("开始捕获屏幕…")
+        Timber.d("开始通过 Shizuku 捕获屏幕")
 
         val inMemoryResult = ShizukuShell.executeCommandWithTimeout(12, "screencap", "-p")
         val screenshotBytes = when {
@@ -42,11 +54,16 @@ class ScreenCapture @Inject constructor(
         }
 
         if (bitmap != null) {
-            Timber.d("截图成功: ${bitmap.width}x${bitmap.height}")
+            Timber.d("Shizuku 截图成功: ${bitmap.width}x${bitmap.height}")
             Result.success(bitmap)
         } else {
             Result.failure(Exception("无法解码截图数据"))
         }
+    }
+
+    private suspend fun captureViaAccessibility(): Result<Bitmap> = withContext(Dispatchers.Main) {
+        Timber.d("尝试通过无障碍服务捕获屏幕")
+        accessibilityBridge.captureScreenshot()
     }
 
     fun compressBitmap(bitmap: Bitmap, maxSizeKB: Int = MAX_SIZE_KB): Bitmap {
@@ -86,9 +103,8 @@ class ScreenCapture @Inject constructor(
             }
         }
 
-    fun getDataUri(bitmap: Bitmap): String {
-        return "data:image/jpeg;base64,${bitmapToBase64(bitmap)}"
-    }
+    fun getDataUri(bitmap: Bitmap): String =
+        "data:image/jpeg;base64,${bitmapToBase64(bitmap)}"
 
     private fun captureViaTempFile(): Result<ByteArray> {
         val tempDir = "/data/local/tmp/autoai"
