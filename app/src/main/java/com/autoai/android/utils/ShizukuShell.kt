@@ -2,17 +2,26 @@ package com.autoai.android.utils
 
 import rikka.shizuku.Shizuku
 import timber.log.Timber
+import java.lang.reflect.Method
 import java.nio.charset.Charset
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
- * Shizuku Shell命令执行工具
- * 通过 Shizuku.newProcess 执行系统级 Shell 指令
+ * 使用 Shizuku 执行 Shell 命令，提供统一的结果封装与超时处理。
  */
 object ShizukuShell {
 
     private val streamCharset: Charset = Charsets.ISO_8859_1
+
+    private val newProcessMethod: Method by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        Shizuku::class.java.getDeclaredMethod(
+            "newProcess",
+            Array<String>::class.java,
+            Array<String>::class.java,
+            String::class.java
+        ).apply { isAccessible = true }
+    }
 
     fun executeCommand(vararg command: String): ShellResult =
         runCommand(timeoutSeconds = null, command = command)
@@ -28,7 +37,7 @@ object ShizukuShell {
 
         val commandLine = command.joinToString(" ")
         return try {
-            val process = Shizuku.newProcess(command.copyOf(), null, null)
+            val process = spawnProcess(command)
             try {
                 val stdoutBuilder = StringBuilder()
                 val stderrBuilder = StringBuilder()
@@ -96,6 +105,12 @@ object ShizukuShell {
             Timber.e(e, "执行Shell命令异常: $commandLine")
             ShellResult(isSuccess = false, output = "", errorMessage = e.message ?: "未知错误")
         }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun spawnProcess(command: Array<out String>): Process {
+        val args = command.map { it }.toTypedArray()
+        return newProcessMethod.invoke(null, args, null, null) as Process
     }
 }
 
