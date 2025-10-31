@@ -46,7 +46,7 @@ import javax.inject.Inject
 
 /**
  * Main activity that loads the appropriate navigation stack based on the current control mode.
- * Main activity that selects the proper navigation stack based on the active control mode.
+ */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -58,9 +58,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Timber.d("MainActivity created")
 
-        // Pre-initialize Shizuku state listeners to avoid stale status when switching modes
+        // Pre-initialize Shizuku so we have an up-to-date status snapshot.
         shizukuManager.initialize()
-        // Pre-initialize Shizuku so mode switches have up-to-date status information
+
         setContent {
             AutoAITheme {
                 val controlMode by operationExecutor.controlModeFlow.collectAsState(initial = ControlMode.ACCESSIBILITY)
@@ -108,22 +108,20 @@ private fun MainContent(
     when (controlMode) {
         ControlMode.ACCESSIBILITY -> {
             when {
-                accessibilityStatus.isReady() -> {
-                    AppNavigation(navController)
-                }
+                accessibilityStatus.isReady() -> AppNavigation(navController)
                 accessibilityStatus == AccessibilityStatus.CONNECTING -> {
                     StatusScreen(
                         title = "正在连接无障碍服务…",
                         description = "请稍候，AutoAI 正在等待系统完成无障碍服务的绑定。",
                         primaryButtonLabel = null,
                         onPrimaryClick = null,
-                        secondaryDescription = "若长时间无响应，请到设置 > 辅助功能 > 下载的应用中重新启用 AutoAI。"
+                        secondaryDescription = "若长时间无响应，请到设置 > 辅助功能 > 已下载的服务中重新启用 AutoAI。"
                     )
                 }
                 accessibilityStatus == AccessibilityStatus.SERVICE_DISABLED -> {
                     StatusScreen(
                         title = "请启用无障碍服务",
-                        description = "AutoAI 现已支持无障碍模式，无需 Shizuku 也能执行大部分自动化操作。请点击下方按钮，前往系统设置启用 AutoAI 无障碍服务。",
+                        description = "AutoAI 支持无障碍模式，无需 Shizuku 也能执行大部分自动化操作。点击下方按钮前往系统设置启用 AutoAI 无障碍服务。",
                         primaryButtonLabel = "打开无障碍设置",
                         onPrimaryClick = { accessibilityBridge.openAccessibilitySettings() },
                         secondaryDescription = "打开设置后，请在“已下载的服务”列表中找到 AutoAI 并启用。"
@@ -131,7 +129,7 @@ private fun MainContent(
                 }
                 else -> {
                     StatusScreen(
-                        title = "无障碍服务出现异常",
+                        title = "无障碍服务异常",
                         description = "无法连接到无障碍服务，请尝试在系统设置中关闭后重新启用 AutoAI 服务。",
                         primaryButtonLabel = "前往无障碍设置",
                         onPrimaryClick = { accessibilityBridge.openAccessibilitySettings() },
@@ -144,10 +142,7 @@ private fun MainContent(
             if (shizukuStatus.canExecute()) {
                 AppNavigation(navController)
             } else {
-                ShizukuStatusScreen(
-                    status = shizukuStatus,
-                    shizukuManager = shizukuManager
-                )
+                ShizukuStatusScreen(status = shizukuStatus, shizukuManager = shizukuManager)
             }
         }
     }
@@ -155,10 +150,7 @@ private fun MainContent(
 
 @Composable
 private fun AppNavigation(navController: androidx.navigation.NavHostController) {
-    NavHost(
-        navController = navController,
-        startDestination = "chat"
-    ) {
+    NavHost(navController = navController, startDestination = "chat") {
         composable("chat") {
             ChatScreen(
                 onNavigateToSettings = { navController.navigate("settings") },
@@ -198,24 +190,13 @@ private fun StatusScreen(
             style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold)
         )
         Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
+        Text(text = title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = description,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text(text = description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.height(24.dp))
 
         if (primaryButtonLabel != null && onPrimaryClick != null) {
-            Button(
-                onClick = onPrimaryClick,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+            Button(onClick = onPrimaryClick, modifier = Modifier.fillMaxWidth()) {
                 Text(primaryButtonLabel)
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -225,20 +206,13 @@ private fun StatusScreen(
         }
 
         if (!secondaryDescription.isNullOrBlank()) {
-            Text(
-                text = secondaryDescription,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text(text = secondaryDescription, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
 @Composable
-private fun ShizukuStatusScreen(
-    status: ShizukuStatus,
-    shizukuManager: ShizukuManager
-) {
+private fun ShizukuStatusScreen(status: ShizukuStatus, shizukuManager: ShizukuManager) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -246,48 +220,23 @@ private fun ShizukuStatusScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text(
-            text = "Shizuku 权限未就绪",
-            style = MaterialTheme.typography.titleLarge
-        )
-
+        Text(text = "Shizuku 权限未就绪", style = MaterialTheme.typography.titleLarge)
         Spacer(modifier = Modifier.height(16.dp))
-
         ShizukuStatusCard(status = status, shizukuManager = shizukuManager)
     }
 }
 
 @Composable
-private fun ShizukuStatusCard(
-    status: ShizukuStatus,
-    shizukuManager: ShizukuManager
-) {
+private fun ShizukuStatusCard(status: ShizukuStatus, shizukuManager: ShizukuManager) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = "当前状态：${status.label}",
-                style = MaterialTheme.typography.titleMedium
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = status.description,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(text = "当前状态：${status.label}", style = MaterialTheme.typography.titleMedium)
+            Text(text = status.description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (status == ShizukuStatus.PERMISSION_REQUIRED) {
-                Spacer(modifier = Modifier.height(20.dp))
-                Button(
-                    onClick = { shizukuManager.requestPermission() },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Button(onClick = { shizukuManager.requestPermission() }, modifier = Modifier.fillMaxWidth()) {
                     Text("在 Shizuku 中授予权限")
                 }
             }
@@ -308,7 +257,7 @@ private val ShizukuStatus.label: String
 private val ShizukuStatus.description: String
     get() = when (this) {
         ShizukuStatus.UNKNOWN -> "正在检测 Shizuku 服务状态，请稍候…"
-        ShizukuStatus.NOT_INSTALLED -> "请先在设备上安装并激活 Shizuku，再返回此界面。"
+        ShizukuStatus.NOT_INSTALLED -> "请先在设备上安装并激活 Shizuku，然后返回此界面。"
         ShizukuStatus.NOT_RUNNING -> "Shizuku 服务未运行，请在 Shizuku 应用中启动服务。"
         ShizukuStatus.PERMISSION_REQUIRED -> "需要在 Shizuku 应用中授予 AutoAI 权限才能继续。"
         ShizukuStatus.AVAILABLE -> "Shizuku 权限已就绪，AutoAI 可以获得系统级控制能力。"
