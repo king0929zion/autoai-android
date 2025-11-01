@@ -206,7 +206,7 @@ class AccessibilityBridge @Inject constructor(
                         val colorSpace: ColorSpace? = result.colorSpace
                         val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)?.copy(Bitmap.Config.ARGB_8888, false)
                         hardwareBuffer.close()
-                        result.close()
+                        
                         if (bitmap != null) {
                             continuation.resume(Result.success(bitmap))
                         } else {
