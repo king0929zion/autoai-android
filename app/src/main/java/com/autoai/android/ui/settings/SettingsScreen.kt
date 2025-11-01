@@ -480,6 +480,7 @@ private data class StatusInfo(
 )
 
 @Composable
+@Composable
 private fun AccessibilityStatus.toStatusInfo(onOpenSettings: () -> Unit): StatusInfo = when (this) {
     AccessibilityStatus.READY -> StatusInfo(
         headline = stringResource(R.string.settings_accessibility_ready),
@@ -506,6 +507,7 @@ private fun AccessibilityStatus.toStatusInfo(onOpenSettings: () -> Unit): Status
     )
 }
 
+@Composable
 @Composable
 private fun ShizukuStatus.toStatusInfo(onOpenShizuku: () -> Unit): StatusInfo = when (this) {
     ShizukuStatus.AVAILABLE -> StatusInfo(
