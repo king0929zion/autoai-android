@@ -2,8 +2,8 @@ package com.autoai.android.accessibility
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.accessibilityservice.AccessibilityService.ScreenshotResult
 import android.accessibilityservice.AccessibilityService.TakeScreenshotCallback
-import android.accessibilityservice.ScreenshotResult
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -217,8 +217,8 @@ class AccessibilityBridge @Inject constructor(
                     }
                 }
 
-                override fun onFailure(errorCode: Int, message: CharSequence?) {
-                    continuation.resume(Result.failure(IllegalStateException("Screenshot failed: code=$errorCode message=${message ?: "unknown"}")))
+                override fun onFailure(errorCode: Int) {
+                    continuation.resume(Result.failure(IllegalStateException("Screenshot failed: code=$errorCode")))
                 }
             })
         }

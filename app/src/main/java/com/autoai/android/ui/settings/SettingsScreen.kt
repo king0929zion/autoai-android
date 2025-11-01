@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -480,7 +481,6 @@ private data class StatusInfo(
 )
 
 @Composable
-@Composable
 private fun AccessibilityStatus.toStatusInfo(onOpenSettings: () -> Unit): StatusInfo = when (this) {
     AccessibilityStatus.READY -> StatusInfo(
         headline = stringResource(R.string.settings_accessibility_ready),
@@ -507,7 +507,6 @@ private fun AccessibilityStatus.toStatusInfo(onOpenSettings: () -> Unit): Status
     )
 }
 
-@Composable
 @Composable
 private fun ShizukuStatus.toStatusInfo(onOpenShizuku: () -> Unit): StatusInfo = when (this) {
     ShizukuStatus.AVAILABLE -> StatusInfo(
