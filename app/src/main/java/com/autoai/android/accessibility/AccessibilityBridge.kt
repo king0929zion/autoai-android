@@ -2,6 +2,8 @@ package com.autoai.android.accessibility
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.accessibilityservice.AccessibilityService.TakeScreenshotCallback
+import android.accessibilityservice.ScreenshotResult
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -37,7 +39,8 @@ import kotlin.coroutines.resumeWithException
 import kotlin.coroutines.suspendCoroutine
 
 /**
- * 无障碍控制桥接层，负责维护服务引用并对外提供手势、文本输入、截图、树遍历等功能。
+ * Bridge layer that exposes high level accessibility interactions such as gestures,
+ * text input, screenshot capture and view hierarchy inspection.
  */
 @Singleton
 class AccessibilityBridge @Inject constructor(
@@ -54,7 +57,7 @@ class AccessibilityBridge @Inject constructor(
     fun onServiceConnected(service: AccessibilityControlService) {
         serviceRef.set(service)
         _status.value = AccessibilityStatus.READY
-        Timber.i("Accessibility service ready")
+        Timber.i("Accessibility service connected")
     }
 
     fun onServiceDisconnected(service: AccessibilityControlService) {
@@ -89,9 +92,7 @@ class AccessibilityBridge @Inject constructor(
     }
 
     fun openAccessibilitySettings() {
-        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
-        }
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK }
         context.startActivity(intent)
     }
 
@@ -157,10 +158,9 @@ class AccessibilityBridge @Inject constructor(
 
         val success = focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
         if (!success) {
-            // 尝试粘贴作为降级方案
             val clipboard = ContextCompat.getSystemService(context, ClipboardManager::class.java)
             clipboard?.setPrimaryClip(ClipData.newPlainText("autoai", text))
-            service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_PASTE)
+            focused.performAction(AccessibilityNodeInfo.ACTION_PASTE)
         }
         return success
     }
@@ -168,17 +168,18 @@ class AccessibilityBridge @Inject constructor(
     private fun findEditableNode(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
         if (node == null) return null
         if (node.isEditable) return node
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i)
-            val result = findEditableNode(child)
-            if (result != null) return result
-            child?.recycle()
+        for (index in 0 until node.childCount) {
+            val child = node.getChild(index) ?: continue
+            val editable = findEditableNode(child)
+            if (editable != null) {
+                return editable
+            }
+            child.recycle()
         }
         return null
     }
 
-    fun performGlobalAction(action: Int): Boolean =
-        serviceRef.get()?.performGlobalAction(action) ?: false
+    fun performGlobalAction(action: Int): Boolean = serviceRef.get()?.performGlobalAction(action) ?: false
 
     fun launchApp(packageName: String): Boolean {
         val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName) ?: return false
@@ -186,38 +187,40 @@ class AccessibilityBridge @Inject constructor(
         return runCatching { context.startActivity(launchIntent); true }.getOrDefault(false)
     }
 
-    fun currentPackageName(): String? =
-        serviceRef.get()?.rootInActiveWindow?.packageName?.toString()
+    fun currentPackageName(): String? = serviceRef.get()?.rootInActiveWindow?.packageName?.toString()
 
     fun rootViewNode(): AccessibilityNodeInfo? = serviceRef.get()?.rootInActiveWindow
 
     suspend fun captureScreenshot(): Result<Bitmap> {
-        val service = serviceRef.get() ?: return Result.failure(IllegalStateException("无障碍服务未连接"))
+        val service = serviceRef.get() ?: return Result.failure(IllegalStateException("Accessibility service not connected"))
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            return Result.failure(UnsupportedOperationException("当前系统版本不支持无障碍截图，请切换到 Shizuku 模式"))
+            return Result.failure(UnsupportedOperationException("Accessibility screenshots require Android 11 or later"))
         }
         return suspendCoroutine { continuation ->
             val displayId = resolveDisplayId(service)
             val executor = ContextCompat.getMainExecutor(context)
-            service.takeScreenshot(displayId, executor) { result ->
-                if (result == null) {
-                    continuation.resume(Result.failure(IllegalStateException("截图失败：返回结果为空")))
-                    return@takeScreenshot
-                }
-                try {
-                    val hardwareBuffer = result.hardwareBuffer
-                    val colorSpace: ColorSpace? = result.colorSpace
-                    val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)?.copy(Bitmap.Config.ARGB_8888, false)
-                    hardwareBuffer.close()
-                    if (bitmap != null) {
-                        continuation.resume(Result.success(bitmap))
-                    } else {
-                        continuation.resume(Result.failure(IllegalStateException("无法从硬件缓冲区创建位图")))
+            service.takeScreenshot(displayId, executor, object : TakeScreenshotCallback {
+                override fun onSuccess(result: ScreenshotResult) {
+                    try {
+                        val hardwareBuffer = result.hardwareBuffer
+                        val colorSpace: ColorSpace? = result.colorSpace
+                        val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)?.copy(Bitmap.Config.ARGB_8888, false)
+                        hardwareBuffer.close()
+                        result.close()
+                        if (bitmap != null) {
+                            continuation.resume(Result.success(bitmap))
+                        } else {
+                            continuation.resume(Result.failure(IllegalStateException("Unable to create bitmap from screenshot buffer")))
+                        }
+                    } catch (error: Exception) {
+                        continuation.resume(Result.failure(error))
                     }
-                } catch (e: Exception) {
-                    continuation.resume(Result.failure(e))
                 }
-            }
+
+                override fun onFailure(errorCode: Int, message: CharSequence?) {
+                    continuation.resume(Result.failure(IllegalStateException("Screenshot failed: code=$errorCode message=${message ?: "unknown"}")))
+                }
+            })
         }
     }
 
@@ -231,18 +234,12 @@ class AccessibilityBridge @Inject constructor(
     }
 
     fun buildViewHierarchy(): Result<ScreenState.ViewNode> {
-        val root = serviceRef.get()?.rootInActiveWindow ?: return Result.failure(IllegalStateException("无法获取当前界面控件树，请确认无障碍服务已启用"))
-        return try {
-            Result.success(convertNode(root))
-        } catch (e: Exception) {
-            Timber.e(e, "Convert view hierarchy failed")
-            Result.failure(e)
-        }
+        val root = serviceRef.get()?.rootInActiveWindow ?: return Result.failure(IllegalStateException("Unable to access current window"))
+        return runCatching { convertNode(root) }
     }
 
     private fun convertNode(node: AccessibilityNodeInfo): ScreenState.ViewNode {
-        val bounds = Rect()
-        node.getBoundsInScreen(bounds)
+        val bounds = Rect().also { node.getBoundsInScreen(it) }
         val children = mutableListOf<ScreenState.ViewNode>()
         for (index in 0 until node.childCount) {
             val child = node.getChild(index) ?: continue

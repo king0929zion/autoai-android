@@ -16,13 +16,38 @@ object ShizukuShell {
     private val streamCharset: Charset = Charsets.ISO_8859_1
     private val errorStreamCharset: Charset = Charsets.UTF_8
 
-    private val newProcessMethod: Method by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-        Shizuku::class.java.getDeclaredMethod(
-            "newProcess",
-            Array<String>::class.java,
-            Array<String>::class.java,
-            String::class.java
-        ).apply { isAccessible = true }
+    private val newProcessMethod: Method? by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+        val candidates: List<Array<Class<*>>> = listOf(
+            arrayOf(
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java,
+                Int::class.javaPrimitiveType!!
+            ),
+            arrayOf(
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            ),
+            arrayOf(
+                Array<String>::class.java,
+                Array<String>::class.java
+            ),
+            arrayOf(Array<String>::class.java)
+        )
+
+        val clazz = Shizuku::class.java
+        for (signature in candidates) {
+            val method = runCatching {
+                clazz.getDeclaredMethod("newProcess", *signature).apply { isAccessible = true }
+            }.getOrNull()
+            if (method != null) {
+                Timber.i("ShizukuShell resolved newProcess signature with ${signature.size} parameters")
+                return@lazy method
+            }
+        }
+        Timber.e("Unable to resolve Shizuku.newProcess reflection signature")
+        null
     }
 
     fun executeCommand(vararg command: String): ShellResult =
@@ -39,6 +64,15 @@ object ShizukuShell {
 
         val commandLine = command.joinToString(" ")
         return try {
+            if (newProcessMethod == null) {
+                Timber.e("Cannot execute command because Shizuku.newProcess could not be resolved")
+                return ShellResult(
+                    isSuccess = false,
+                    output = "",
+                    errorMessage = "Shizuku command execution is not supported on this version of Shizuku"
+                )
+            }
+
             val process = spawnProcess(command)
             try {
                 val stdoutBuffer = ByteArrayOutputStream()
@@ -119,8 +153,21 @@ object ShizukuShell {
 
     @Suppress("UNCHECKED_CAST")
     private fun spawnProcess(command: Array<out String>): Process {
+        val method = newProcessMethod
+            ?: error("Shizuku newProcess method not available. Check Shizuku version compatibility.")
+
         val args = command.map { it }.toTypedArray()
-        return newProcessMethod.invoke(null, args, null, null) as Process
+        val parameters = method.parameterTypes.size
+
+        @Suppress("UNCHECKED_CAST")
+        val process = when (parameters) {
+            4 -> method.invoke(null, args, null, null, 0) as Process
+            3 -> method.invoke(null, args, null, null) as Process
+            2 -> method.invoke(null, args, null) as Process
+            1 -> method.invoke(null, args) as Process
+            else -> throw IllegalStateException("Unsupported Shizuku.newProcess signature with $parameters parameters")
+        }
+        return process
     }
 }
 

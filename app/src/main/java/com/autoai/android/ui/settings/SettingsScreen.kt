@@ -1,20 +1,18 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+﻿@file:OptIn(ExperimentalMaterial3Api::class)
 
 package com.autoai.android.ui.settings
 
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,25 +20,30 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessibilityNew
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.Science
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,15 +53,23 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.autoai.android.R
 import com.autoai.android.accessibility.AccessibilityBridge
 import com.autoai.android.accessibility.AccessibilityStatus
 import com.autoai.android.decision.VLMClient
@@ -66,9 +77,8 @@ import com.autoai.android.permission.ControlMode
 import com.autoai.android.permission.OperationExecutor
 import com.autoai.android.permission.ShizukuManager
 import com.autoai.android.permission.ShizukuStatus
-import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.collectLatest
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -87,7 +97,7 @@ fun SettingsScreen(
     val baseUrl by viewModel.baseUrl.collectAsState()
     val modelName by viewModel.modelName.collectAsState()
     val temperature by viewModel.temperature.collectAsState()
-    val maxTokens by viewModel.maxTokens.collectAsState()
+    val maxTokensInput by viewModel.maxTokensInput.collectAsState()
     val isDarkTheme by viewModel.isDarkTheme.collectAsState()
     val isSaved by viewModel.isSaved.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
@@ -111,41 +121,43 @@ fun SettingsScreen(
 
     LaunchedEffect(isSaved) {
         if (isSaved) {
-            scope.launch { snackbarHostState.showSnackbar("配置已保存") }
+            scope.launch {
+                snackbarHostState.showSnackbar(context.getString(R.string.settings_save_success))
+            }
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设置") },
+                title = { Text(text = stringResource(R.string.settings)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { padding ->
+    ) { innerPadding ->
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(padding)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 16.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            ControlModeSection(
+            ControlModeCard(
                 controlMode = controlMode,
                 shizukuStatus = shizukuStatus,
                 accessibilityStatus = accessibilityStatus,
-                onModeSelected = { mode -> viewModel.switchControlMode(mode) },
-                onOpenAccessibilitySettings = { viewModel.openAccessibilitySettings() },
+                onModeSelected = viewModel::switchControlMode,
+                onOpenAccessibilitySettings = viewModel::openAccessibilitySettings,
                 onOpenShizuku = { openShizukuApp(context) }
             )
 
-            ApiSettingsSection(
+            ApiSettingsCard(
                 apiKey = apiKey,
                 onApiKeyChange = viewModel::updateApiKey,
                 baseUrl = baseUrl,
@@ -154,7 +166,7 @@ fun SettingsScreen(
                 onModelNameChange = viewModel::updateModelName,
                 temperature = temperature,
                 onTemperatureChange = viewModel::updateTemperature,
-                maxTokens = maxTokens,
+                maxTokens = maxTokensInput,
                 onMaxTokensChange = viewModel::updateMaxTokens,
                 isDarkTheme = isDarkTheme,
                 onDarkThemeChange = viewModel::updateDarkTheme,
@@ -167,7 +179,7 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun ControlModeSection(
+private fun ControlModeCard(
     controlMode: ControlMode,
     shizukuStatus: ShizukuStatus,
     accessibilityStatus: AccessibilityStatus,
@@ -175,118 +187,91 @@ private fun ControlModeSection(
     onOpenAccessibilitySettings: () -> Unit,
     onOpenShizuku: () -> Unit
 ) {
+    val statusInfo = when (controlMode) {
+        ControlMode.ACCESSIBILITY -> accessibilityStatus.toStatusInfo(onOpenAccessibilitySettings)
+        ControlMode.SHIZUKU -> shizukuStatus.toStatusInfo(onOpenShizuku)
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                text = "控制模式",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                text = "可在无障碍模式和 Shizuku 模式之间切换。默认推荐无障碍模式，更易启用且无需额外应用。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = stringResource(R.string.settings_control_mode_title),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Text(
+                    text = stringResource(R.string.settings_control_mode_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
-            SingleChoiceSegmentedButtonRow {
-                androidx.compose.material3.SegmentedButton(
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FilterChip(
                     selected = controlMode.isAccessibility(),
                     onClick = { onModeSelected(ControlMode.ACCESSIBILITY) },
-                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 2),
-                    icon = { Icon(Icons.Default.AccessibilityNew, contentDescription = null) },
-                    label = { Text("无障碍模式") }
+                    label = { Text(stringResource(R.string.settings_control_mode_accessibility)) },
+                    leadingIcon = { Icon(Icons.Default.AccessibilityNew, contentDescription = null) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 )
-                androidx.compose.material3.SegmentedButton(
+
+                FilterChip(
                     selected = controlMode.isShizuku(),
                     onClick = { onModeSelected(ControlMode.SHIZUKU) },
-                    shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 2),
-                    icon = { Icon(Icons.Default.Bolt, contentDescription = null) },
-                    label = { Text("Shizuku 模式") }
+                    label = { Text(stringResource(R.string.settings_control_mode_shizuku)) },
+                    leadingIcon = { Icon(Icons.Default.Bolt, contentDescription = null) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
                 )
             }
 
-            val (statusLabel, statusDescription, actionLabel, action) = when (controlMode) {
-                ControlMode.ACCESSIBILITY -> {
-                    val label = when {
-                        accessibilityStatus.isReady() -> "已就绪"
-                        accessibilityStatus == AccessibilityStatus.SERVICE_DISABLED -> "未启用"
-                        accessibilityStatus == AccessibilityStatus.CONNECTING -> "连接中"
-                        else -> "异常"
-                    }
-                    val description = when (accessibilityStatus) {
-                        AccessibilityStatus.SERVICE_DISABLED ->
-                            "请在系统设置 > 辅助功能 > 已下载的服务中启用 AutoAI。"
-                        AccessibilityStatus.CONNECTING ->
-                            "正在等待系统完成无障碍服务绑定…"
-                        AccessibilityStatus.READY ->
-                            "无障碍服务已连接，可直接下发操作指令。"
-                        AccessibilityStatus.ERROR ->
-                            "无障碍服务异常，请重新启用或重启设备后再试。"
-                    }
-                    val actionText = if (accessibilityStatus.isReady()) null else "打开无障碍设置"
-                    Quad(label, description, actionText, onOpenAccessibilitySettings)
-                }
-
-                ControlMode.SHIZUKU -> {
-                    val label = shizukuStatus.label
-                    val description = shizukuStatus.description
-                    val actionText = if (shizukuStatus == ShizukuStatus.PERMISSION_REQUIRED) "打开 Shizuku 授权" else "启动 Shizuku 应用"
-                    Quad(label, description, actionText, onOpenShizuku)
-                }
-            }
-
-            StatusBlock(
-                statusLabel = statusLabel,
-                statusDescription = statusDescription,
-                actionLabel = actionLabel,
-                onAction = action
-            )
+            StatusSummary(statusInfo = statusInfo)
         }
     }
 }
-
 @Composable
-private fun StatusBlock(
-    statusLabel: String,
-    statusDescription: String,
-    actionLabel: String?,
-    onAction: () -> Unit
-) {
+private fun StatusSummary(statusInfo: StatusInfo) {
     Surface(
-        tonalElevation = 2.dp,
-        shape = MaterialTheme.shapes.medium
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = statusLabel,
-                    style = MaterialTheme.typography.titleSmall
-                )
-            }
             Text(
-                text = statusDescription,
+                text = statusInfo.headline,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = statusInfo.description,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            if (!actionLabel.isNullOrBlank()) {
-                Button(onClick = onAction) {
-                    Text(actionLabel)
+
+            AnimatedVisibility(
+                visible = statusInfo.actionLabel != null && statusInfo.onAction != null,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                val actionLabel = statusInfo.actionLabel
+                val action = statusInfo.onAction
+                if (actionLabel != null && action != null) {
+                    AssistChip(onClick = action, label = { Text(actionLabel) })
                 }
             }
         }
@@ -294,7 +279,7 @@ private fun StatusBlock(
 }
 
 @Composable
-private fun ApiSettingsSection(
+private fun ApiSettingsCard(
     apiKey: String,
     onApiKeyChange: (String) -> Unit,
     baseUrl: String,
@@ -303,8 +288,8 @@ private fun ApiSettingsSection(
     onModelNameChange: (String) -> Unit,
     temperature: Float,
     onTemperatureChange: (Float) -> Unit,
-    maxTokens: Int,
-    onMaxTokensChange: (Int) -> Unit,
+    maxTokens: String,
+    onMaxTokensChange: (String) -> Unit,
     isDarkTheme: Boolean,
     onDarkThemeChange: (Boolean) -> Unit,
     apiTestState: ApiTestState,
@@ -320,203 +305,257 @@ private fun ApiSettingsSection(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "API 配置",
-                style = MaterialTheme.typography.titleMedium
+                text = stringResource(R.string.settings_api_section_title),
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
             )
+
             OutlinedTextField(
                 value = apiKey,
                 onValueChange = onApiKeyChange,
-                label = { Text("API Key") },
+                label = { Text(stringResource(R.string.settings_api_key_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
+
             OutlinedTextField(
                 value = baseUrl,
                 onValueChange = onBaseUrlChange,
-                label = { Text("API 基础 URL") },
+                label = { Text(stringResource(R.string.settings_api_endpoint_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
+
             OutlinedTextField(
                 value = modelName,
                 onValueChange = onModelNameChange,
-                label = { Text("模型名称") },
+                label = { Text(stringResource(R.string.settings_api_model_label)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
 
-        Surface(
-            tonalElevation = 2.dp,
-            shape = MaterialTheme.shapes.medium
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "高级参数",
-                    style = MaterialTheme.typography.titleSmall
+                    text = stringResource(R.string.settings_temperature_label, temperature),
+                    style = MaterialTheme.typography.bodyMedium
                 )
-                TemperatureSlider(
-                    temperature = temperature,
-                    onTemperatureChange = onTemperatureChange
+                Slider(
+                    value = temperature,
+                    onValueChange = onTemperatureChange,
+                    valueRange = 0.0f..1.2f,
+                    steps = 10,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
+                    )
                 )
-                MaxTokenSelector(
-                    maxTokens = maxTokens,
-                    onMaxTokensChange = onMaxTokensChange
+            }
+
+            OutlinedTextField(
+                value = maxTokens,
+                onValueChange = onMaxTokensChange,
+                label = { Text(stringResource(R.string.settings_max_tokens_label)) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Switch(checked = isDarkTheme, onCheckedChange = onDarkThemeChange)
+                Text(
+                    text = stringResource(R.string.settings_dark_theme_toggle),
+                    style = MaterialTheme.typography.bodyMedium
                 )
+            }
+
+            ApiTestStatus(state = apiTestState)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = onTestConnection,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(stringResource(R.string.settings_test_button))
+                }
+                Button(
+                    onClick = onSave,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(stringResource(R.string.settings_save_button))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ApiTestStatus(state: ApiTestState) {
+    Crossfade(targetState = state, label = "api_test_state") { current ->
+        when (current) {
+            ApiTestState.Idle -> Unit
+            ApiTestState.Loading -> {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(text = "深色主题", style = MaterialTheme.typography.bodyMedium)
-                    Switch(
-                        checked = isDarkTheme,
-                        onCheckedChange = onDarkThemeChange
+                    LinearProgressIndicator(modifier = Modifier.weight(1f))
+                    Text(
+                        text = stringResource(R.string.settings_testing_status),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-        }
 
-        ConnectionTestBlock(
-            apiTestState = apiTestState,
-            onTestConnection = onTestConnection
-        )
+            is ApiTestState.Success -> {
+                val preview = current.responsePreview.ifBlank {
+                    stringResource(R.string.settings_api_success_message)
+                }
+                StatusBanner(
+                    icon = Icons.Default.CloudDone,
+                    tint = MaterialTheme.colorScheme.primary,
+                    title = stringResource(R.string.settings_api_success_title, current.latencyMs),
+                    message = preview
+                )
+            }
 
-        Button(
-            onClick = onSave,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(Icons.Default.CloudDone, contentDescription = null)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("保存配置")
-        }
+            is ApiTestState.Failure -> {
+                StatusBanner(
+                    icon = Icons.Default.ErrorOutline,
+                    tint = MaterialTheme.colorScheme.error,
+                    title = stringResource(R.string.settings_api_failure_title),
+                    message = stringResource(R.string.settings_api_failure_message, current.message)
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun TemperatureSlider(
-    temperature: Float,
-    onTemperatureChange: (Float) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Temperature：${String.format("%.2f", temperature)}", style = MaterialTheme.typography.bodyMedium)
-        Text(
-            text = "较低数值更稳重，较高数值更富创造力。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        androidx.compose.material3.Slider(
-            value = temperature,
-            onValueChange = onTemperatureChange,
-            valueRange = 0f..1f,
-            steps = 19
-        )
-    }
-}
-
-@Composable
-private fun MaxTokenSelector(
-    maxTokens: Int,
-    onMaxTokensChange: (Int) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("最大 Tokens：$maxTokens", style = MaterialTheme.typography.bodyMedium)
-        Text(
-            text = "控制单次回答的长度，过高可能导致调用耗时增加。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        androidx.compose.material3.Slider(
-            value = maxTokens.toFloat(),
-            onValueChange = { onMaxTokensChange(it.toInt()) },
-            valueRange = 128f..4096f,
-            steps = 30
-        )
-    }
-}
-
-@Composable
-private fun ConnectionTestBlock(
-    apiTestState: ApiTestState,
-    onTestConnection: () -> Unit
+private fun StatusBanner(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: androidx.compose.ui.graphics.Color,
+    title: String,
+    message: String
 ) {
     Surface(
-        tonalElevation = 2.dp,
+        color = tint.copy(alpha = 0.12f),
         shape = MaterialTheme.shapes.medium
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Science, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "API 连接测试", style = MaterialTheme.typography.titleSmall)
-            }
-
-            Text(
-                text = "测试当前配置是否可用，会发起一次轻量的诊断请求。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Button(onClick = onTestConnection) {
-                Text("开始测试")
-            }
-
-            AnimatedVisibility(visible = apiTestState !is ApiTestState.Idle) {
-                when (apiTestState) {
-                    ApiTestState.Idle -> {}
-                    ApiTestState.Loading -> Text("测试进行中…", style = MaterialTheme.typography.bodySmall)
-                    is ApiTestState.Success -> {
-                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("延迟：${apiTestState.latencyMs} ms", style = MaterialTheme.typography.bodySmall)
-                            Text(
-                                text = "响应预览：${apiTestState.responsePreview}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                    is ApiTestState.Failure -> {
-                        Text(
-                            text = "测试失败：${apiTestState.message}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
+            Icon(icon, contentDescription = null, tint = tint)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
 }
 
-private fun openShizukuApp(context: Context) {
-    val packageName = "moe.shizuku.privileged.api"
-    val intent = context.packageManager.getLaunchIntentForPackage(packageName)
-        ?: Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
-    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-    try {
-        context.startActivity(intent)
-    } catch (e: ActivityNotFoundException) {
-        Timber.w(e, "无法打开 Shizuku 应用或应用商店")
-    }
+private data class StatusInfo(
+    val headline: String,
+    val description: String,
+    val actionLabel: String? = null,
+    val onAction: (() -> Unit)? = null
+)
+
+@Composable
+private fun AccessibilityStatus.toStatusInfo(onOpenSettings: () -> Unit): StatusInfo = when (this) {
+    AccessibilityStatus.READY -> StatusInfo(
+        headline = stringResource(R.string.settings_accessibility_ready),
+        description = stringResource(R.string.settings_accessibility_ready_desc)
+    )
+
+    AccessibilityStatus.CONNECTING -> StatusInfo(
+        headline = stringResource(R.string.settings_accessibility_connecting),
+        description = stringResource(R.string.settings_accessibility_connecting_desc)
+    )
+
+    AccessibilityStatus.SERVICE_DISABLED -> StatusInfo(
+        headline = stringResource(R.string.settings_accessibility_disabled),
+        description = stringResource(R.string.settings_accessibility_disabled_desc),
+        actionLabel = stringResource(R.string.settings_accessibility_open_button),
+        onAction = onOpenSettings
+    )
+
+    AccessibilityStatus.ERROR -> StatusInfo(
+        headline = stringResource(R.string.settings_accessibility_error),
+        description = stringResource(R.string.settings_accessibility_error_desc),
+        actionLabel = stringResource(R.string.settings_accessibility_open_button),
+        onAction = onOpenSettings
+    )
 }
 
+@Composable
+private fun ShizukuStatus.toStatusInfo(onOpenShizuku: () -> Unit): StatusInfo = when (this) {
+    ShizukuStatus.AVAILABLE -> StatusInfo(
+        headline = stringResource(R.string.settings_shizuku_ready),
+        description = stringResource(R.string.settings_shizuku_ready_desc)
+    )
+
+    ShizukuStatus.PERMISSION_REQUIRED -> StatusInfo(
+        headline = stringResource(R.string.settings_shizuku_permission),
+        description = stringResource(R.string.settings_shizuku_permission_desc),
+        actionLabel = stringResource(R.string.settings_shizuku_open_button),
+        onAction = onOpenShizuku
+    )
+
+    ShizukuStatus.NOT_RUNNING -> StatusInfo(
+        headline = stringResource(R.string.settings_shizuku_not_running),
+        description = stringResource(R.string.settings_shizuku_not_running_desc),
+        actionLabel = stringResource(R.string.settings_shizuku_open_button),
+        onAction = onOpenShizuku
+    )
+
+    ShizukuStatus.NOT_INSTALLED -> StatusInfo(
+        headline = stringResource(R.string.settings_shizuku_not_installed),
+        description = stringResource(R.string.settings_shizuku_not_installed_desc),
+        actionLabel = stringResource(R.string.settings_shizuku_website_button),
+        onAction = onOpenShizuku
+    )
+
+    ShizukuStatus.UNKNOWN -> StatusInfo(
+        headline = stringResource(R.string.settings_shizuku_unknown),
+        description = stringResource(R.string.settings_shizuku_unknown_desc),
+        actionLabel = stringResource(R.string.settings_shizuku_open_button),
+        onAction = onOpenShizuku
+    )
+
+    ShizukuStatus.ERROR -> StatusInfo(
+        headline = stringResource(R.string.settings_shizuku_error),
+        description = stringResource(R.string.settings_shizuku_error_desc),
+        actionLabel = stringResource(R.string.settings_shizuku_open_button),
+        onAction = onOpenShizuku
+    )
+}
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val vlmClient: VLMClient,
     private val operationExecutor: OperationExecutor,
     private val shizukuManager: ShizukuManager,
-    private val accessibilityBridge: AccessibilityBridge
+    private val accessibilityBridge: AccessibilityBridge,
+    @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
     private val _apiKey = MutableStateFlow("")
@@ -528,11 +567,11 @@ class SettingsViewModel @Inject constructor(
     private val _modelName = MutableStateFlow(DEFAULT_MODEL)
     val modelName: StateFlow<String> = _modelName.asStateFlow()
 
-    private val _temperature = MutableStateFlow(0.4f)
+    private val _temperature = MutableStateFlow(DEFAULT_TEMPERATURE)
     val temperature: StateFlow<Float> = _temperature.asStateFlow()
 
-    private val _maxTokens = MutableStateFlow(1024)
-    val maxTokens: StateFlow<Int> = _maxTokens.asStateFlow()
+    private val _maxTokensInput = MutableStateFlow(DEFAULT_MAX_TOKENS.toString())
+    val maxTokensInput: StateFlow<String> = _maxTokensInput.asStateFlow()
 
     private val _isDarkTheme = MutableStateFlow(false)
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
@@ -566,6 +605,9 @@ class SettingsViewModel @Inject constructor(
                     _apiKey.value = preferences[API_KEY] ?: ""
                     _baseUrl.value = preferences[BASE_URL] ?: DEFAULT_BASE_URL
                     _modelName.value = preferences[MODEL_NAME] ?: DEFAULT_MODEL
+                    _temperature.value = preferences[TEMPERATURE] ?: DEFAULT_TEMPERATURE
+                    _maxTokensInput.value = (preferences[MAX_TOKENS] ?: DEFAULT_MAX_TOKENS).toString()
+                    _isDarkTheme.value = preferences[DARK_THEME] ?: false
                 }
         }
     }
@@ -586,12 +628,13 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun updateTemperature(value: Float) {
-        _temperature.value = value
+        _temperature.value = value.coerceIn(0f, 1.5f)
         markDirty(resetTest = true)
     }
 
-    fun updateMaxTokens(value: Int) {
-        _maxTokens.value = value.coerceIn(128, 4096)
+    fun updateMaxTokens(value: String) {
+        val sanitized = value.filter { it.isDigit() }.take(4)
+        _maxTokensInput.value = sanitized
         markDirty(resetTest = true)
     }
 
@@ -609,65 +652,88 @@ class SettingsViewModel @Inject constructor(
     fun saveSettings() {
         viewModelScope.launch {
             try {
-                if (_apiKey.value.isBlank()) {
-                    _errorMessage.value = "API Key 不能为空"
-                    return@launch
-                }
-                if (_baseUrl.value.isBlank()) {
-                    _errorMessage.value = "API 基础 URL 不能为空"
-                    return@launch
-                }
-                if (!_baseUrl.value.startsWith("http://") && !_baseUrl.value.startsWith("https://")) {
-                    _errorMessage.value = "API 基础 URL 必须以 http:// 或 https:// 开头"
-                    return@launch
-                }
-                if (_modelName.value.isBlank()) {
-                    _errorMessage.value = "模型名称不能为空"
-                    return@launch
+                val apiKey = _apiKey.value.trim()
+                val baseUrl = _baseUrl.value.trim()
+                val modelName = _modelName.value.trim()
+                val maxTokens = resolveMaxTokens()
+
+                when {
+                    apiKey.isBlank() -> {
+                        _errorMessage.value = appContext.getString(R.string.settings_error_api_key_empty)
+                        return@launch
+                    }
+
+                    baseUrl.isBlank() -> {
+                        _errorMessage.value = appContext.getString(R.string.settings_error_endpoint_empty)
+                        return@launch
+                    }
+
+                    !baseUrl.startsWith("http://") && !baseUrl.startsWith("https://") -> {
+                        _errorMessage.value = appContext.getString(R.string.settings_error_endpoint_schema)
+                        return@launch
+                    }
+
+                    modelName.isBlank() -> {
+                        _errorMessage.value = appContext.getString(R.string.settings_error_model_empty)
+                        return@launch
+                    }
                 }
 
                 dataStore.edit { preferences ->
-                    preferences[API_KEY] = _apiKey.value
-                    preferences[BASE_URL] = _baseUrl.value
-                    preferences[MODEL_NAME] = _modelName.value
+                    preferences[API_KEY] = apiKey
+                    preferences[BASE_URL] = baseUrl
+                    preferences[MODEL_NAME] = modelName
+                    preferences[TEMPERATURE] = _temperature.value
+                    preferences[MAX_TOKENS] = maxTokens
+                    preferences[DARK_THEME] = _isDarkTheme.value
                 }
 
                 vlmClient.configure(
-                    apiKey = _apiKey.value,
-                    baseUrl = _baseUrl.value,
-                    modelName = _modelName.value
+                    apiKey = apiKey,
+                    baseUrl = baseUrl,
+                    modelName = modelName
                 )
 
+                _maxTokensInput.value = maxTokens.toString()
                 _isSaved.value = true
                 _errorMessage.value = null
-            } catch (e: Exception) {
-                Timber.e(e, "保存配置失败")
-                _errorMessage.value = "保存失败：${e.message ?: "未知错误"}"
+            } catch (error: Exception) {
+                Timber.e(error, "Failed to save settings")
+                val message = error.message ?: appContext.getString(R.string.settings_error_save_unknown)
+                _errorMessage.value = appContext.getString(R.string.settings_error_save_failed, message)
             }
         }
     }
 
     fun testApiConnection() {
-        if (_apiKey.value.isBlank()) {
-            _apiTestState.value = ApiTestState.Failure("请先填写 API Key")
-            return
-        }
-        if (_baseUrl.value.isBlank()) {
-            _apiTestState.value = ApiTestState.Failure("API 基础 URL 不能为空")
-            return
+        val apiKey = _apiKey.value.trim()
+        val baseUrl = _baseUrl.value.trim()
+        val modelName = _modelName.value.trim()
+        val maxTokens = resolveMaxTokens()
+
+        when {
+            apiKey.isBlank() -> {
+                _apiTestState.value = ApiTestState.Failure(appContext.getString(R.string.settings_test_missing_key))
+                return
+            }
+
+            baseUrl.isBlank() -> {
+                _apiTestState.value = ApiTestState.Failure(appContext.getString(R.string.settings_test_missing_endpoint))
+                return
+            }
         }
 
         viewModelScope.launch {
             _apiTestState.value = ApiTestState.Loading
             try {
                 vlmClient.configure(
-                    apiKey = _apiKey.value,
-                    baseUrl = _baseUrl.value,
-                    modelName = _modelName.value
+                    apiKey = apiKey,
+                    baseUrl = baseUrl,
+                    modelName = modelName
                 )
                 val result = vlmClient.testConnection(
                     temperature = _temperature.value,
-                    maxTokens = _maxTokens.value
+                    maxTokens = maxTokens
                 )
                 result.onSuccess { diagnostics ->
                     _apiTestState.value = ApiTestState.Success(
@@ -675,11 +741,15 @@ class SettingsViewModel @Inject constructor(
                         responsePreview = diagnostics.responsePreview
                     )
                 }.onFailure { error ->
-                    _apiTestState.value = ApiTestState.Failure(error.message ?: "连接失败，请稍后重试")
+                    _apiTestState.value = ApiTestState.Failure(
+                        error.message ?: appContext.getString(R.string.error_unknown)
+                    )
                 }
-            } catch (e: Exception) {
-                Timber.e(e, "API 连接测试异常")
-                _apiTestState.value = ApiTestState.Failure(e.message ?: "连接测试异常")
+            } catch (error: Exception) {
+                Timber.e(error, "API test failed")
+                _apiTestState.value = ApiTestState.Failure(
+                    error.message ?: appContext.getString(R.string.error_unknown)
+                )
             }
         }
     }
@@ -692,6 +762,9 @@ class SettingsViewModel @Inject constructor(
         _errorMessage.value = null
     }
 
+    private fun resolveMaxTokens(): Int =
+        _maxTokensInput.value.toIntOrNull()?.coerceIn(128, 4096) ?: DEFAULT_MAX_TOKENS
+
     private fun markDirty(resetTest: Boolean = false) {
         _isSaved.value = false
         if (resetTest) {
@@ -703,9 +776,14 @@ class SettingsViewModel @Inject constructor(
         private val API_KEY = stringPreferencesKey("api_key")
         private val BASE_URL = stringPreferencesKey("base_url")
         private val MODEL_NAME = stringPreferencesKey("model_name")
+        private val TEMPERATURE = floatPreferencesKey("temperature")
+        private val MAX_TOKENS = intPreferencesKey("max_tokens")
+        private val DARK_THEME = booleanPreferencesKey("dark_theme")
 
         private const val DEFAULT_BASE_URL = "https://api.siliconflow.cn/"
         private const val DEFAULT_MODEL = "Qwen/Qwen2-VL-7B-Instruct"
+        private const val DEFAULT_TEMPERATURE = 0.4f
+        private const val DEFAULT_MAX_TOKENS = 1024
     }
 }
 
@@ -716,9 +794,22 @@ sealed class ApiTestState {
     data class Failure(val message: String) : ApiTestState()
 }
 
-private data class Quad(
-    val label: String,
-    val description: String,
-    val actionLabel: String?,
-    val action: () -> Unit
-)
+private fun openShizukuApp(context: Context) {
+    val packageName = "moe.shizuku.privileged.api"
+    val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+    if (launchIntent != null) {
+        val launched = runCatching {
+            context.startActivity(launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            true
+        }.getOrElse {
+            Timber.e(it, "Unable to start Shizuku app")
+            false
+        }
+        if (launched) return
+    }
+
+    runCatching {
+        val webpage = Intent(Intent.ACTION_VIEW, Uri.parse("https://shizuku.rikka.app/"))
+        context.startActivity(webpage.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }.onFailure { Timber.e(it, "Unable to open Shizuku website") }
+}

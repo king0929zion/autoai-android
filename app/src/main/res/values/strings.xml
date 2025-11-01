@@ -1,97 +1,150 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 基础 -->
+    <!-- Common -->
     <string name="app_name">AutoAI</string>
-    <string name="ok">确定</string>
-    <string name="cancel">取消</string>
-    <string name="confirm">确认</string>
-    <string name="retry">重试</string>
-    <string name="settings">设置</string>
-    <string name="back">返回</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
+    <string name="retry">Retry</string>
+    <string name="settings">Settings</string>
+    <string name="back">Back</string>
 
-    <!-- 主界面 -->
-    <string name="chat_title">AI 助手</string>
-    <string name="input_hint">告诉我你想做什么…</string>
-    <string name="send">发送</string>
-    <string name="voice_input">语音输入</string>
-    <string name="chat_toolbar_title">AutoAI 控机</string>
-    <string name="chat_toolbar_subtitle_ready">随时告诉我新的指令</string>
-    <string name="chat_toolbar_subtitle_running">正在执行任务…</string>
-    <string name="chat_placeholder_input">我想让你…</string>
-    <string name="chat_action_history">历史记录</string>
-    <string name="chat_action_help">帮助</string>
-    <string name="chat_action_clear">清除对话</string>
-    <string name="chat_action_send">发送</string>
+    <!-- Chat -->
+    <string name="chat_title">AI Assistant</string>
+    <string name="input_hint">How can I help you today?</string>
+    <string name="send">Send</string>
+    <string name="voice_input">Voice</string>
+    <string name="chat_toolbar_title">AutoAI Console</string>
+    <string name="chat_toolbar_subtitle_ready">Ready for your next request</string>
+    <string name="chat_toolbar_subtitle_running">Currently processing a task</string>
+    <string name="chat_placeholder_input">Describe what you need...</string>
+    <string name="chat_action_history">History</string>
+    <string name="chat_action_help">Help</string>
+    <string name="chat_action_clear">Clear chat</string>
+    <string name="chat_action_send">Send</string>
 
-    <!-- 任务状态 -->
-    <string name="task_pending">等待开始</string>
-    <string name="task_analyzing">正在分析</string>
-    <string name="task_executing">执行中</string>
-    <string name="task_paused">已暂停</string>
-    <string name="task_completed">已完成</string>
-    <string name="task_failed">执行失败</string>
-    <string name="task_terminated">已终止</string>
+    <!-- Task status -->
+    <string name="task_pending">Waiting to start</string>
+    <string name="task_analyzing">Analyzing</string>
+    <string name="task_executing">In progress</string>
+    <string name="task_paused">Paused</string>
+    <string name="task_completed">Completed</string>
+    <string name="task_failed">Failed</string>
+    <string name="task_terminated">Cancelled</string>
 
-    <!-- 操作 -->
-    <string name="pause_task">暂停任务</string>
-    <string name="resume_task">继续任务</string>
-    <string name="terminate_task">终止任务</string>
-    <string name="view_details">查看详情</string>
+    <!-- Actions -->
+    <string name="pause_task">Pause task</string>
+    <string name="resume_task">Resume task</string>
+    <string name="terminate_task">Stop task</string>
+    <string name="view_details">View details</string>
 
-    <!-- 权限 -->
-    <string name="shizuku_not_available">Shizuku 未安装或未激活</string>
-    <string name="shizuku_permission_required">需要 Shizuku 权限才能执行操作</string>
-    <string name="request_permission">申请权限</string>
-    <string name="overlay_permission_required">需要悬浮窗权限</string>
-    <string name="grant_permission">授予权限</string>
+    <!-- Permissions -->
+    <string name="shizuku_not_available">Shizuku is not installed or running.</string>
+    <string name="shizuku_permission_required">Grant Shizuku permission to run privileged commands.</string>
+    <string name="request_permission">Request permission</string>
+    <string name="overlay_permission_required">Overlay permission is required.</string>
+    <string name="grant_permission">Grant permission</string>
 
-    <!-- 设置 -->
-    <string name="api_settings">API 设置</string>
-    <string name="api_key">API 密钥</string>
-    <string name="api_endpoint">API 端点</string>
-    <string name="model_name">模型名称</string>
+    <!-- Settings -->
+    <string name="api_settings">API Settings</string>
+    <string name="api_key">API Key</string>
+    <string name="api_endpoint">API Endpoint</string>
+    <string name="model_name">Model name</string>
     <string name="temperature">Temperature</string>
-    <string name="save">保存</string>
+    <string name="save">Save</string>
 
-    <!-- 安全提示 -->
-    <string name="payment_detected_title">检测到支付操作</string>
-    <string name="payment_detected_message">为了您的资金安全，已自动暂停任务。请手动完成支付后再继续。</string>
-    <string name="continue_after_payment">支付后继续</string>
-    <string name="sensitive_operation_title">敏感操作确认</string>
-    <string name="sensitive_operation_message">即将执行以下操作，需要您的确认：</string>
+    <!-- Safety prompts -->
+    <string name="payment_detected_title">Payment screen detected</string>
+    <string name="payment_detected_message">For your security the task was paused. Complete the payment manually and resume when finished.</string>
+    <string name="continue_after_payment">Continue</string>
+    <string name="sensitive_operation_title">Confirm sensitive action</string>
+    <string name="sensitive_operation_message">Please confirm that you want AutoAI to continue with this action.</string>
 
-    <!-- 错误提示 -->
-    <string name="error_network">网络连接失败</string>
-    <string name="error_api">API 调用失败</string>
-    <string name="error_permission">权限不足</string>
-    <string name="error_unknown">未知错误</string>
+    <!-- Errors -->
+    <string name="error_network">Network unavailable. Check your connection.</string>
+    <string name="error_api">API request failed. Verify your configuration.</string>
+    <string name="error_permission">Missing permission. Review the setup.</string>
+    <string name="error_unknown">Unexpected error occurred.</string>
 
-    <!-- 引导 -->
-    <string name="welcome_title">欢迎使用 AutoAI</string>
-    <string name="welcome_message">让 AI 帮你自动完成手机操作</string>
-    <string name="setup_shizuku">第一步：激活 Shizuku</string>
-    <string name="setup_api">第二步：配置 API</string>
-    <string name="setup_permissions">第三步：授予权限</string>
-    <string name="setup_complete">开始使用</string>
+    <!-- Onboarding -->
+    <string name="welcome_title">Welcome to AutoAI</string>
+    <string name="welcome_message">Automate complex phone operations with AI assistance.</string>
+    <string name="setup_shizuku">Step 1 - Connect Shizuku</string>
+    <string name="setup_api">Step 2 - Configure API</string>
+    <string name="setup_permissions">Step 3 - Grant permissions</string>
+    <string name="setup_complete">Start using AutoAI</string>
 
-    <!-- Chat 消息文案 -->
-    <string name="chat_message_welcome">你好，我是 AutoAI，可以帮你执行手机上的复杂操作。直接描述你的目标即可开始。</string>
-    <string name="chat_message_processing">正在分析和规划步骤…</string>
-    <string name="chat_message_default_success">操作已完成。</string>
-    <string name="chat_message_unknown_reason">原因未知</string>
-    <string name="chat_message_unknown_error_hint">请查看日志</string>
-    <string name="chat_message_clear">对话已清空，请告诉我新的目标。</string>
-    <string name="chat_result_success">✅ 已完成：
-%1$s</string>
-    <string name="chat_result_failure">⚠️ 执行失败：%1$s</string>
-    <string name="chat_result_exception">⚠️ 发生异常：%1$s</string>
-    <string name="chat_summary_title">当前任务</string>
-    <string name="chat_summary_status">状态：%1$s</string>
+    <!-- Chat copy -->
+    <string name="chat_message_welcome">Hi, I am AutoAI. Tell me what you want to accomplish on your phone and I will plan the steps.</string>
+    <string name="chat_message_processing">Thinking and preparing the next actions...</string>
+    <string name="chat_message_default_success">Everything completed successfully.</string>
+    <string name="chat_message_unknown_reason">Reason unknown</string>
+    <string name="chat_message_unknown_error_hint">Check the task details for more info.</string>
+    <string name="chat_message_clear">Chat history cleared. Ready for a new scenario.</string>
+    <string name="chat_result_success">Success\n%1$s</string>
+    <string name="chat_result_failure">Failed\n%1$s</string>
+    <string name="chat_result_exception">Error\n%1$s</string>
+    <string name="chat_summary_title">Current task</string>
+    <string name="chat_summary_status">Status: %1$s</string>
 
     <!-- TodoList -->
-    <string name="todo_list_title">任务清单</string>
-    <string name="current_step">当前步骤</string>
-    <string name="completed_steps">已完成 %1$d/%2$d 项</string>
-    <string name="estimated_time">预计剩余时间：%1$s</string>
+    <string name="todo_list_title">Task checklist</string>
+    <string name="current_step">Current step</string>
+    <string name="completed_steps">Completed %1$d of %2$d steps</string>
+    <string name="estimated_time">Estimated time left: %1$s</string>
+
+    <!-- Settings -->
+    <string name="settings_save_success">Settings saved</string>
+    <string name="settings_control_mode_title">Control mode</string>
+    <string name="settings_control_mode_description">Choose how AutoAI executes actions on your device.</string>
+    <string name="settings_control_mode_accessibility">Accessibility</string>
+    <string name="settings_control_mode_shizuku">Shizuku</string>
+    <string name="settings_api_section_title">API configuration</string>
+    <string name="settings_api_key_label">API key</string>
+    <string name="settings_api_endpoint_label">Endpoint</string>
+    <string name="settings_api_model_label">Model name</string>
+    <string name="settings_temperature_label">Temperature (%.2f)</string>
+    <string name="settings_max_tokens_label">Max tokens</string>
+    <string name="settings_dark_theme_toggle">Enable dark theme override</string>
+    <string name="settings_test_button">Test connection</string>
+    <string name="settings_save_button">Save</string>
+    <string name="settings_testing_status">Testing...</string>
+    <string name="settings_api_success_title">API reachable (%1$d ms)</string>
+    <string name="settings_api_success_message">Service responded successfully.</string>
+    <string name="settings_api_failure_title">API test failed</string>
+    <string name="settings_api_failure_message">%1$s</string>
+    <string name="settings_error_api_key_empty">API key cannot be empty.</string>
+    <string name="settings_error_endpoint_empty">Endpoint cannot be empty.</string>
+    <string name="settings_error_endpoint_schema">Endpoint must start with http:// or https://.</string>
+    <string name="settings_error_model_empty">Model name cannot be empty.</string>
+    <string name="settings_error_save_failed">Failed to save settings: %1$s</string>
+    <string name="settings_error_save_unknown">unknown error</string>
+    <string name="settings_test_missing_key">Enter your API key first.</string>
+    <string name="settings_test_missing_endpoint">Endpoint cannot be empty.</string>
+
+    <!-- Settings - status -->
+    <string name="settings_accessibility_ready">Accessibility service is active</string>
+    <string name="settings_accessibility_ready_desc">AutoAI can now send gestures and read the screen.</string>
+    <string name="settings_accessibility_connecting">Connecting to accessibility service</string>
+    <string name="settings_accessibility_connecting_desc">Waiting for Android to finish binding the AutoAI accessibility service...</string>
+    <string name="settings_accessibility_disabled">Accessibility service is disabled</string>
+    <string name="settings_accessibility_disabled_desc">Enable the AutoAI service in Settings &gt; Accessibility &gt; Downloaded apps.</string>
+    <string name="settings_accessibility_error">Accessibility service error</string>
+    <string name="settings_accessibility_error_desc">Restart the service or reboot the device, then try again.</string>
+    <string name="settings_accessibility_open_button">Open accessibility settings</string>
+    <string name="settings_shizuku_ready">Shizuku is ready</string>
+    <string name="settings_shizuku_ready_desc">Privileged shell commands can be executed.</string>
+    <string name="settings_shizuku_permission">Grant Shizuku permission</string>
+    <string name="settings_shizuku_permission_desc">Open the Shizuku app and authorize AutoAI.</string>
+    <string name="settings_shizuku_not_running">Shizuku service is stopped</string>
+    <string name="settings_shizuku_not_running_desc">Launch the Shizuku app and start the service to continue.</string>
+    <string name="settings_shizuku_not_installed">Shizuku is not installed</string>
+    <string name="settings_shizuku_not_installed_desc">Install Shizuku on the device to use privileged mode.</string>
+    <string name="settings_shizuku_unknown">Waiting for Shizuku status</string>
+    <string name="settings_shizuku_unknown_desc">If this message persists, open the Shizuku app to refresh the connection.</string>
+    <string name="settings_shizuku_error">Shizuku connection error</string>
+    <string name="settings_shizuku_error_desc">Try restarting the Shizuku service or reconnecting via wireless ADB.</string>
+    <string name="settings_shizuku_open_button">Open Shizuku</string>
+    <string name="settings_shizuku_website_button">Open Shizuku website</string>
 
 </resources>

@@ -11,20 +11,20 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * 通过无障碍服务执行系统控制操作。
+ * Executes system actions via Android accessibility service gestures and APIs.
  */
 @Singleton
 class AccessibilityActionExecutor @Inject constructor(
     private val bridge: AccessibilityBridge
 ) : ControlActionExecutor {
 
-    override val label: String = "无障碍模式"
+    override val label: String = "Accessibility mode"
 
     override suspend fun isReady(): Boolean = bridge.isReady()
 
     override suspend fun executeAction(action: Action): ActionResult {
         if (!bridge.isReady()) {
-            return ActionResult.failure("无障碍服务未就绪，请先在系统设置中启用 AutoAI 无障碍服务")
+            return ActionResult.failure("Accessibility service is not enabled. Please enable the AutoAI accessibility service in system settings.")
         }
 
         return when (action) {
@@ -35,22 +35,22 @@ class AccessibilityActionExecutor @Inject constructor(
             is Action.PressKey -> performPressKey(action.keyCode, action.keyName)
             is Action.OpenApp -> performOpenApp(action.packageName, action.appName)
             is Action.Wait -> performWait(action.durationMs)
-            Action.GoBack -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK, "返回")
-            is Action.Complete -> ActionResult.success(action.message.ifBlank { "任务已完成" })
+            Action.GoBack -> performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK, "Back")
+            is Action.Complete -> ActionResult.success(action.message.ifBlank { "Task completed" })
             is Action.Error -> ActionResult.failure(action.message, needsUserConfirmation = !action.recoverable)
-            is Action.RequestUserHelp -> ActionResult.failure("需要用户协助：${action.reason}", needsUserConfirmation = true)
+            is Action.RequestUserHelp -> ActionResult.failure("User assistance required: ${action.reason}", needsUserConfirmation = true)
         }
     }
 
     override suspend fun getCurrentApp(): Result<String> {
         if (!bridge.isReady()) {
-            return Result.failure(IllegalStateException("无障碍服务未启用"))
+            return Result.failure(IllegalStateException("Accessibility service is not enabled"))
         }
         val packageName = bridge.currentPackageName()
         return if (!packageName.isNullOrBlank()) {
             Result.success(packageName)
         } else {
-            Result.failure(IllegalStateException("未能识别前台应用，请尝试重新打开界面"))
+            Result.failure(IllegalStateException("Unable to determine the foreground application. Try opening the target screen again."))
         }
     }
 
@@ -58,9 +58,9 @@ class AccessibilityActionExecutor @Inject constructor(
         val success = bridge.performClick(action.x, action.y)
         return if (success) {
             delay(DEFAULT_ACTION_DELAY)
-            ActionResult.success("已点击 (${action.x}, ${action.y})")
+            ActionResult.success("Tapped (${action.x}, ${action.y})")
         } else {
-            ActionResult.failure("无障碍点击失败，请确认目标控件可见")
+            ActionResult.failure("Accessibility tap failed. Ensure the target element is visible.")
         }
     }
 
@@ -68,9 +68,9 @@ class AccessibilityActionExecutor @Inject constructor(
         val success = bridge.performLongClick(action.x, action.y, action.durationMs)
         return if (success) {
             delay(DEFAULT_ACTION_DELAY)
-            ActionResult.success("已长按 (${action.x}, ${action.y})")
+            ActionResult.success("Long press executed at (${action.x}, ${action.y})")
         } else {
-            ActionResult.failure("无障碍长按失败")
+            ActionResult.failure("Accessibility long press failed.")
         }
     }
 
@@ -78,9 +78,9 @@ class AccessibilityActionExecutor @Inject constructor(
         val success = bridge.performSwipe(action.fromX, action.fromY, action.toX, action.toY, action.durationMs)
         return if (success) {
             delay(DEFAULT_ACTION_DELAY)
-            ActionResult.success("滑动已完成")
+            ActionResult.success("Swipe completed")
         } else {
-            ActionResult.failure("无障碍滑动失败")
+            ActionResult.failure("Accessibility swipe failed.")
         }
     }
 
@@ -88,14 +88,13 @@ class AccessibilityActionExecutor @Inject constructor(
         val success = bridge.setText(action.text)
         return if (success) {
             delay(DEFAULT_ACTION_DELAY)
-            ActionResult.success("输入文本成功")
+            ActionResult.success("Text input applied")
         } else {
-            ActionResult.failure("文本输入失败，请先点击输入框后重试")
+            ActionResult.failure("Text input failed. Focus the text field and try again.")
         }
     }
 
     private suspend fun performPressKey(keyCode: Int, keyName: String): ActionResult {
-
         val mapped = when (keyCode) {
             KeyEvent.KEYCODE_BACK -> AccessibilityService.GLOBAL_ACTION_BACK
             KeyEvent.KEYCODE_HOME -> AccessibilityService.GLOBAL_ACTION_HOME
@@ -105,9 +104,11 @@ class AccessibilityActionExecutor @Inject constructor(
 
         return if (mapped != null && bridge.performGlobalAction(mapped)) {
             delay(DEFAULT_ACTION_DELAY)
-            ActionResult.success("已执行按键${if (keyName.isNotBlank()) "：$keyName" else ""}")
+            val label = keyName.ifBlank { "keyCode=$keyCode" }
+            ActionResult.success("Executed key action: $label")
         } else {
-            ActionResult.failure("当前模式无法模拟该按键：${keyName.ifBlank { "keyCode=$keyCode" }}")
+            val label = keyName.ifBlank { "keyCode=$keyCode" }
+            ActionResult.failure("Unable to simulate key action: $label")
         }
     }
 
@@ -115,24 +116,24 @@ class AccessibilityActionExecutor @Inject constructor(
         val opened = bridge.launchApp(packageName)
         return if (opened) {
             delay(APP_LAUNCH_DELAY)
-            ActionResult.success("已尝试打开${appName.ifBlank { packageName }}")
+            ActionResult.success("Attempted to launch ${appName.ifBlank { packageName }}")
         } else {
-            ActionResult.failure("无法打开目标应用，请确认已安装：$packageName")
+            ActionResult.failure("Failed to launch $packageName. Ensure the app is installed.")
         }
     }
 
     private suspend fun performWait(durationMs: Long): ActionResult {
         delay(durationMs)
-        return ActionResult.success("已等待 ${durationMs}ms")
+        return ActionResult.success("Waited ${durationMs}ms")
     }
 
     private suspend fun performGlobalAction(action: Int, description: String): ActionResult {
         val executed = bridge.performGlobalAction(action)
         return if (executed) {
             delay(DEFAULT_ACTION_DELAY)
-            ActionResult.success("已执行$description操作")
+            ActionResult.success("Executed $description action")
         } else {
-            ActionResult.failure("执行$description操作失败，请手动尝试")
+            ActionResult.failure("Failed to execute $description action. Please try manually.")
         }
     }
 
